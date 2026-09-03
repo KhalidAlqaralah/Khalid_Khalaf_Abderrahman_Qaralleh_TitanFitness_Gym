@@ -1,0 +1,6 @@
+<Solution>
+  <Project Path="TitanFitness.Api/TitanFitness.Api.csproj" />
+  <Project Path="TitanFitness.Application/TitanFitness.Application.csproj" />
+  <Project Path="TitanFitness.Domain/TitanFitness.Domain.csproj" />
+  <Project Path="TitanFitness.Infrastructure/TitanFitness.Infrastructure.csproj" />
+</Solution>
