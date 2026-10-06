@@ -1,0 +1,45 @@
+<div class="d-flex align-items-center justify-content-between gap-3 mb-4">
+  <div class="d-flex align-items-center gap-3">
+    <button type="button" class="btn btn-outline-navy" aria-label="Back to the member directory" (click)="back()" data-testid="profile-back">
+      <i class="bi bi-arrow-left"></i>
+    </button>
+    <h1>Member Profile</h1>
+  </div>
+  @if (member()) {
+    <button type="button" class="btn btn-outline-navy" (click)="edit()" data-testid="edit-profile">Edit Profile</button>
+  }
+</div>
+
+@if (loading()) {
+  <div class="state-box"><span class="spinner-border spinner-border-sm me-2"></span>Loading member…</div>
+} @else if (notFound()) {
+  <div class="tf-card state-box" data-testid="member-not-found"><i class="bi bi-person-x"></i>Member not found.
+    <div class="mt-2"><button type="button" class="btn btn-outline-navy btn-sm" (click)="back()">Back to the directory</button></div>
+  </div>
+} @else if (member(); as m) {
+  <div class="row g-4">
+    <div class="col-lg-4 d-grid gap-4 align-content-start">
+      <app-identity-card [member]="m" />
+      @if (membershipLoaded()) {
+        <app-plan-card [membership]="membership()" (freeze)="freeze()" (sell)="sell()" (renew)="renew()" />
+      } @else {
+        <div class="tf-card state-box"><span class="spinner-border spinner-border-sm me-2"></span>Loading plan…</div>
+      }
+    </div>
+    <div class="col-lg-8 d-grid gap-4 align-content-start">
+      @if (membershipLoaded()) {
+      <div class="row g-4">
+        <div class="col-md-6">
+          <app-usage-card label="Freezes Used" icon="bi-snow" [used]="membership()?.freezesUsed ?? 0" [max]="membership()?.maxFreezes ?? 0"
+                          unit="freeze" units="freezes" testId="freezes-used" />
+        </div>
+        <div class="col-md-6">
+          <app-usage-card label="Guest Passes" icon="bi-person-plus" [used]="membership()?.guestPassesIssued ?? 0"
+                          [max]="membership()?.guestPassQuota ?? 0" unit="pass" units="passes" testId="guest-passes" />
+        </div>
+      </div>
+      }
+      <app-activity-list [items]="activity()" [loading]="activityLoading()" />
+    </div>
+  </div>
+}

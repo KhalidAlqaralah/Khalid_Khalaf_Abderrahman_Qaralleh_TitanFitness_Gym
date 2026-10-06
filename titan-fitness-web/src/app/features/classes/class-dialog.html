@@ -1,0 +1,129 @@
+<div class="dialog-header">
+  <h2>{{ title() }}</h2>
+  <button type="button" class="btn-icon" aria-label="Close" (click)="cancel()"><i class="bi bi-x-lg"></i></button>
+</div>
+
+<form [formGroup]="form" (ngSubmit)="save()" novalidate>
+  <div class="dialog-body" [appAutofocus]="mode() !== 'view'">
+    <div class="row g-3 dialog-row">
+      <div class="col-sm-6">
+        <label class="form-label req" for="cd-name">Class Name</label>
+        <input id="cd-name" class="form-control" formControlName="className" placeholder="e.g., High-Intensity Interval Training"
+               maxlength="80" [class.is-invalid]="error('className')" data-testid="class-name">
+        @if (error('className'); as e) { <div class="invalid-feedback">{{ e }}</div> }
+      </div>
+      <div class="col-sm-6">
+        <label class="form-label req" for="cd-branch">Branch</label>
+        <select id="cd-branch" class="form-select" formControlName="branchId" [class.is-invalid]="error('branchId')">
+          @for (b of branches.branches(); track b.id) { <option [value]="b.id">{{ b.name }} Branch</option> }
+        </select>
+        @if (error('branchId'); as e) { <div class="invalid-feedback">{{ e }}</div> }
+        @if (mode() === 'edit' && form.controls.branchId.disabled) { <div class="form-hint">The branch can't change once the class has bookings.</div> }
+      </div>
+    </div>
+
+    <div class="row g-3 dialog-row">
+      <div class="col-sm-6">
+        <label class="form-label" for="cd-trainer">Trainer / Instructor</label>
+        <select id="cd-trainer" class="form-select" formControlName="trainerId" [class.is-invalid]="error('trainerId')" data-testid="class-trainer">
+          <option [ngValue]="null">Select an instructor</option>
+          @for (t of trainers(); track t.id) { <option [ngValue]="t.id">{{ t.name }}</option> }
+        </select>
+        @if (error('trainerId'); as e) { <div class="invalid-feedback">{{ e }}</div> }
+      </div>
+      <div class="col-sm-6">
+        <label class="form-label" for="cd-studio">Studio / Room</label>
+        <select id="cd-studio" class="form-select" formControlName="studioId" [class.is-invalid]="error('studioId')" data-testid="class-studio">
+          <option [ngValue]="null">Assign a room</option>
+          @for (s of studios(); track s.id) { <option [ngValue]="s.id">{{ s.name }} ({{ s.capacity }} spots)</option> }
+        </select>
+        @if (error('studioId'); as e) { <div class="invalid-feedback">{{ e }}</div> }
+      </div>
+    </div>
+
+    <div class="row g-3 dialog-row">
+      <div class="col-sm-4">
+        <label class="form-label req" for="cd-date">Date</label>
+        <mat-form-field appearance="outline" subscriptSizing="dynamic">
+          <input matInput id="cd-date" [matDatepicker]="dp" formControlName="date" [min]="mode() === 'view' ? null : minDate" placeholder="mm/dd/yyyy" data-testid="class-date">
+          <mat-datepicker-toggle matIconSuffix [for]="dp" />
+          <mat-datepicker #dp />
+        </mat-form-field>
+        @if (error('date'); as e) { <div class="invalid-feedback">{{ e }}</div> }
+      </div>
+      <div class="col-sm-4">
+        <label class="form-label req" for="cd-time">Start Time</label>
+        <mat-form-field appearance="outline" subscriptSizing="dynamic">
+          <input matInput id="cd-time" [matTimepicker]="tp" formControlName="startTime" placeholder="--:-- --" data-testid="class-time">
+          <mat-timepicker-toggle matIconSuffix [for]="tp" />
+          <mat-timepicker #tp interval="15m" />
+        </mat-form-field>
+        @if (error('startTime'); as e) { <div class="invalid-feedback">{{ e }}</div> }
+        @if (form.hasError('startInPast') && form.controls.startTime.touched) { <div class="invalid-feedback">The start time must be later than now.</div> }
+      </div>
+      <div class="col-sm-4">
+        <label class="form-label" for="cd-capacity">Capacity Limit</label>
+        <div class="input-group">
+          <input id="cd-capacity" type="number" class="form-control" formControlName="capacityLimit" placeholder="20" min="1" max="100" step="1"
+                 [class.is-invalid]="error('capacityLimit') || form.hasError('aboveRoom') || form.hasError('belowEnrolment')" data-testid="class-capacity">
+          <span class="input-group-text">spots</span>
+        </div>
+        @if (error('capacityLimit'); as e) { <div class="invalid-feedback">{{ e }}</div> }
+        @if (form.hasError('aboveRoom')) { <div class="invalid-feedback">Not above the room's capacity ({{ form.getError('aboveRoom') }}).</div> }
+        @if (form.hasError('belowEnrolment')) { <div class="invalid-feedback">Not below the current enrolment ({{ form.getError('belowEnrolment') }}).</div> }
+        @if (mode() !== 'add' && session(); as s) {
+          <div class="form-hint" data-testid="class-enrolment">{{ s.enrolled }} / {{ s.capacityLimit }} enrolled · Waitlist: {{ s.waitlist }}</div>
+        } @else {
+          <div class="form-hint">Left empty = 20 spots.</div>
+        }
+      </div>
+    </div>
+
+    <div class="row g-3 dialog-row">
+      <div class="col-sm-7">
+        <span class="form-label d-block">Duration</span>
+        <div class="choice-cards" role="radiogroup" aria-label="Duration">
+          @for (d of durations; track d) {
+            <label class="choice-card" [class.selected]="form.controls.durationInMinutes.value === d" [class.disabled]="form.disabled">
+              <input type="radio" formControlName="durationInMinutes" [value]="d"> {{ d }} min
+            </label>
+          }
+        </div>
+      </div>
+      <div class="col-sm-5">
+        <span class="form-label d-block">Status</span>
+        @if (mode() === 'add') {
+          <span class="tf-badge ok status-open"><span class="dot"></span>Active (Booking Open)</span>
+        } @else {
+          <app-status-badge [status]="session()?.state ?? 'Upcoming'" />
+        }
+      </div>
+    </div>
+
+    <div class="dialog-row">
+      <label class="form-label" for="cd-description">Description <span class="text-muted-tf fw-normal">(Optional)</span></label>
+      <textarea id="cd-description" class="form-control" rows="3" formControlName="description" maxlength="500"
+                placeholder="Add details about the class focus, required equipment, or intensity level..."></textarea>
+      @if (error('description'); as e) { <div class="invalid-feedback">{{ e }}</div> }
+    </div>
+  </div>
+
+  <div class="dialog-footer">
+    @switch (mode()) {
+      @case ('view') {
+        <button type="button" class="btn btn-outline-navy" (click)="ref.close(false)">Close</button>
+        @if (!session()?.isCancelled && session()?.state !== 'Completed') {
+          <button type="button" class="btn btn-navy" (click)="switchToEdit()" data-testid="class-edit"><i class="bi bi-pencil me-1"></i> Edit</button>
+        }
+      }
+      @case ('edit') {
+        <button type="button" class="btn btn-outline-navy" (click)="cancel()">Cancel</button>
+        <button type="submit" class="btn btn-navy" [disabled]="saving()" data-testid="class-save">Save Changes</button>
+      }
+      @default {
+        <button type="button" class="btn btn-outline-navy" (click)="cancel()">Cancel</button>
+        <button type="submit" class="btn btn-navy" [disabled]="saving()" data-testid="class-save"><i class="bi bi-calendar-plus me-1"></i> Schedule Class</button>
+      }
+    }
+  </div>
+</form>

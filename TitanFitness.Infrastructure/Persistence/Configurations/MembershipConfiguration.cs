@@ -1,10 +1,12 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
+using TitanFitness.Domain.Members;
 using TitanFitness.Domain.Memberships;
+using TitanFitness.Domain.Plans;
 
 namespace TitanFitness.Infrastructure.Persistence.Configurations;
 
-public sealed class MembershipConfiguration : IEntityTypeConfiguration<Membership>
+internal sealed class MembershipConfiguration : IEntityTypeConfiguration<Membership>
 {
     public void Configure(EntityTypeBuilder<Membership> builder)
     {
@@ -12,46 +14,74 @@ public sealed class MembershipConfiguration : IEntityTypeConfiguration<Membershi
         builder.HasKey(m => m.Id);
         builder.Property(m => m.Id).ValueGeneratedNever();
 
-        builder.Property(m => m.PurchasedOn).IsRequired();
-        builder.Property(m => m.Status).IsRequired();
-
-        builder.OwnsOne(m => m.Period, period =>
+        builder.ComplexProperty(m => m.Period, period =>
         {
-            period.Property(p => p.Start).HasColumnName("StartDate").IsRequired();
-            period.Property(p => p.End).HasColumnName("EndDate").IsRequired();
+            period.Property(p => p.Start).HasColumnName("StartDate");
+            period.Property(p => p.End).HasColumnName("EndDate");
         });
-        builder.Navigation(m => m.Period).IsRequired();
 
-        builder.OwnsOne(m => m.Terms, terms =>
-        {
-            terms.Property(t => t.Price)
-                 .HasConversion(new MoneyConverter())
-                 .HasColumnType("decimal(18,2)")
-                 .HasColumnName("AgreedPrice")
-                 .IsRequired();
+        // The terms copied at purchase, in their own columns.
+        builder.ComplexProperty(m => m.Terms, terms => TermsMapping.Map(terms, prefix: "Terms"));
 
-            terms.Property(t => t.DurationInMonths).HasColumnName("AgreedDurationInMonths").IsRequired();
-            terms.Property(t => t.MaxFreezeDays).HasColumnName("AgreedMaxFreezeDays").IsRequired();
-            terms.Property(t => t.MaxFreezes).HasColumnName("AgreedMaxFreezes").IsRequired();
-            terms.Property(t => t.GuestPassQuota).HasColumnName("AgreedGuestPassQuota").IsRequired();
-            terms.Property(t => t.AccessScope).HasColumnName("AgreedAccessScope").IsRequired();
-        });
-        builder.Navigation(m => m.Terms).IsRequired();
+        // Membership (many) -> Member (1).
+        builder.HasOne<Member>()
+            .WithMany()
+            .HasForeignKey(m => m.MemberId)
+            .OnDelete(DeleteBehavior.Restrict);
 
+        // Membership (many) -> Plan (1): the plan it was sold from.
+        builder.HasOne<Plan>()
+            .WithMany()
+            .HasForeignKey(m => m.PlanId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        // Membership (1) -> Freezes / GuestPasses (many): children of the aggregate.
         builder.HasMany(m => m.Freezes)
-               .WithOne()
-               .HasForeignKey(f => f.MembershipId)
-               .OnDelete(DeleteBehavior.Cascade);
+            .WithOne()
+            .HasForeignKey(f => f.MembershipId)
+            .OnDelete(DeleteBehavior.Cascade);
 
         builder.HasMany(m => m.GuestPasses)
-               .WithOne()
-               .HasForeignKey(g => g.MembershipId)
-               .OnDelete(DeleteBehavior.Cascade);
+            .WithOne()
+            .HasForeignKey(g => g.MembershipId)
+            .OnDelete(DeleteBehavior.Cascade);
 
-        builder.Navigation(m => m.Freezes).UsePropertyAccessMode(PropertyAccessMode.Field);
-        builder.Navigation(m => m.GuestPasses).UsePropertyAccessMode(PropertyAccessMode.Field);
+        builder.Navigation(m => m.Freezes).HasField("_freezes").UsePropertyAccessMode(PropertyAccessMode.Field).AutoInclude();
+        builder.Navigation(m => m.GuestPasses).HasField("_guestPasses").UsePropertyAccessMode(PropertyAccessMode.Field).AutoInclude();
 
         builder.HasIndex(m => m.MemberId);
-        builder.HasIndex(m => m.PlanId);
+
+        builder.Property<byte[]>(ConfigurationConstants.RowVersion).IsRowVersion();
+    }
+}
+
+internal sealed class FreezeConfiguration : IEntityTypeConfiguration<Freeze>
+{
+    public void Configure(EntityTypeBuilder<Freeze> builder)
+    {
+        builder.ToTable("Freezes");
+        builder.HasKey(f => f.Id);
+        builder.Property(f => f.Id).ValueGeneratedNever();
+
+        builder.ComplexProperty(f => f.Period, period =>
+        {
+            period.Property(p => p.Start).HasColumnName("StartDate");
+            period.Property(p => p.End).HasColumnName("EndDate");
+        });
+
+        builder.Property(f => f.Notes).HasMaxLength(Freeze.NotesMaxLength);
+
+        builder.Ignore(f => f.EffectivePeriod);
+    }
+}
+
+internal sealed class GuestPassConfiguration : IEntityTypeConfiguration<GuestPass>
+{
+    public void Configure(EntityTypeBuilder<GuestPass> builder)
+    {
+        builder.ToTable("GuestPasses");
+        builder.HasKey(g => g.Id);
+        builder.Property(g => g.Id).ValueGeneratedNever();
+        builder.Property(g => g.GuestName).HasMaxLength(GuestPass.GuestNameMaxLength);
     }
 }

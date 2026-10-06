@@ -1,51 +1,70 @@
 using MediatR;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using TitanFitness.Application.Plans.CreatePlan;
-using TitanFitness.Application.Plans.ListPlans;
-using TitanFitness.Application.Plans.UpdatePlan;
+using TitanFitness.Api.Auth;
+using TitanFitness.Api.Common;
+using TitanFitness.Application.Common;
+using TitanFitness.Application.Features.Plans.Commands.CreatePlan;
+using TitanFitness.Application.Features.Plans.Commands.UpdatePlan;
+using TitanFitness.Application.Features.Plans.Contracts;
+using TitanFitness.Application.Features.Plans.Queries.GetPlanById;
+using TitanFitness.Application.Features.Plans.Queries.GetPlanFilterOptions;
+using TitanFitness.Application.Features.Plans.Queries.GetPlanLookup;
+using TitanFitness.Application.Features.Plans.Queries.GetPlans;
 using TitanFitness.Domain.Memberships;
 
 namespace TitanFitness.Api.Controllers;
 
 [ApiController]
 [Route("api/plans")]
+[Authorize(Policy = Policies.Staff)]
 public sealed class PlansController(ISender sender) : ControllerBase
 {
-    [HttpPost]
-    [ProducesResponseType(StatusCodes.Status201Created)]
-    [ProducesResponseType(StatusCodes.Status400BadRequest)]
-    public async Task<IActionResult> Create(CreatePlanCommand command, CancellationToken ct)
+    /// <summary>Plan Catalogue: paged, sortable, filterable by duration, access, price range and status.</summary>
+    [HttpGet]
+    [Authorize(Policy = Policies.Manager)]
+    public Task<PagedResult<PlanResponse>> GetPlans([FromQuery] GetPlansRequest request, CancellationToken cancellationToken)
     {
-        var id = await sender.Send(command, ct);
-        return Created($"/api/plans/{id}", new { id });
+        var statuses = request.Statuses ?? [];
+        bool? published = statuses.Distinct().Count() == 1 ? statuses[0] == "Published" : null;
+
+        return sender.Send(new GetPlansQuery(request.Page, request.PageSize, request.Search, request.SortBy, request.SortDirection,
+            request.Durations ?? [], request.Access, request.MinPrice, request.MaxPrice, published), cancellationToken);
     }
 
-    [HttpGet]
-    [ProducesResponseType(StatusCodes.Status200OK)]
-    public async Task<IActionResult> List([FromQuery] bool publishedOnly = false, CancellationToken ct = default)
-        => Ok(await sender.Send(new ListPlansQuery(publishedOnly), ct));
+    /// <summary>Distinct durations and price bounds for the Filter Plans dialog.</summary>
+    [HttpGet("filter-options")]
+    [Authorize(Policy = Policies.Manager)]
+    public Task<PlanFilterOptionsResponse> GetFilterOptions(CancellationToken cancellationToken) =>
+        sender.Send(new GetPlanFilterOptionsQuery(), cancellationToken);
+
+    /// <summary>Published plans for the Sell Plan dialog on the member profile (front desk can use it).</summary>
+    [HttpGet("lookup")]
+    public Task<IReadOnlyList<PlanResponse>> GetLookup(CancellationToken cancellationToken) =>
+        sender.Send(new GetPlanLookupQuery(), cancellationToken);
+
+    [HttpGet("{id:guid}")]
+    [Authorize(Policy = Policies.Manager)]
+    public async Task<IActionResult> GetById(Guid id, CancellationToken cancellationToken) =>
+        this.FromResult(await sender.Send(new GetPlanByIdQuery(id), cancellationToken));
+
+    [HttpPost]
+    [Authorize(Policy = Policies.Manager)]
+    public async Task<IActionResult> Create(PlanRequest request, CancellationToken cancellationToken)
+    {
+        var result = await sender.Send(new CreatePlanCommand(request.Name, request.Price!.Value, request.DurationInMonths!.Value,
+            request.IsPublished, request.MaxFreezeDays ?? 0, request.MaxFreezes ?? 0, request.GuestPassQuota ?? 0,
+            request.AccessScope ?? AccessScope.HomeBranchOnly), cancellationToken);
+
+        return result.IsSuccess
+            ? CreatedAtAction(nameof(GetById), new { id = result.Value }, new { id = result.Value })
+            : this.ToProblem(result.Error);
+    }
 
     [HttpPut("{id:guid}")]
-    [ProducesResponseType(StatusCodes.Status204NoContent)]
-    [ProducesResponseType(StatusCodes.Status400BadRequest)]
-    [ProducesResponseType(StatusCodes.Status404NotFound)]
-    public async Task<IActionResult> Update(Guid id, UpdatePlanRequest request, CancellationToken ct)
-    {
-        await sender.Send(new UpdatePlanCommand(
-            id, request.Name, request.Price, request.DurationInMonths,
-            request.MaxFreezeDays, request.MaxFreezes, request.GuestPassQuota,
-            request.AccessScope, request.IsPublished), ct);
-
-        return NoContent();
-    }
+    [Authorize(Policy = Policies.Manager)]
+    public async Task<IActionResult> Update(Guid id, PlanRequest request, CancellationToken cancellationToken) =>
+        this.FromResult(await sender.Send(new UpdatePlanCommand(id, request.Name, request.Price!.Value, request.DurationInMonths!.Value,
+            request.IsPublished, request.MaxFreezeDays ?? 0, request.MaxFreezes ?? 0, request.GuestPassQuota ?? 0,
+            request.AccessScope ?? AccessScope.HomeBranchOnly), cancellationToken));
 }
-
-public sealed record UpdatePlanRequest(
-    string Name,
-    decimal Price,
-    int DurationInMonths,
-    int MaxFreezeDays,
-    int MaxFreezes,
-    int GuestPassQuota,
-    AccessScope AccessScope,
-    bool IsPublished);

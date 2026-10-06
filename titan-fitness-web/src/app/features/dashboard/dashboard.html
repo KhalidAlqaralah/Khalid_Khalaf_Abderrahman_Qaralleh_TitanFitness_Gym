@@ -1,0 +1,82 @@
+<div class="mb-4">
+  <h1>Dashboard</h1>
+  <p class="page-subtitle">Live floor statistics and quick actions.</p>
+</div>
+
+<div class="row g-4">
+  <div class="col-xl-8">
+    <div class="row g-4">
+      <div class="col-md-6">
+        <app-kpi-card label="Check-ins today" icon="bi-person-check" [value]="checkInsToday()?.today ?? null"
+                      [loading]="!checkInsToday()" testId="kpi-checkins">
+          {{ changeText() }}
+        </app-kpi-card>
+      </div>
+      <div class="col-md-6">
+        <app-kpi-card label="Active members" icon="bi-people" [value]="(activeMembers()?.activeMembers ?? 0) | number"
+                      [loading]="!activeMembers()" testId="kpi-active">
+          Currently on floor: <span data-testid="kpi-onfloor">{{ activeMembers()?.onFloor ?? 0 }}</span>
+        </app-kpi-card>
+      </div>
+    </div>
+
+    <section class="tf-card mt-4" aria-labelledby="upcoming-title">
+      <div class="tf-card-header">
+        <h2 id="upcoming-title">Upcoming Classes</h2>
+        <a routerLink="/classes" class="link-navy">View Schedule</a>
+      </div>
+      <div class="px-3 pt-3 d-flex flex-wrap gap-2">
+        @for (f of stateFilters; track f) {
+          <button type="button" class="btn btn-sm" [class.btn-navy]="stateFilter() === f" [class.btn-outline-navy]="stateFilter() !== f"
+                  (click)="stateFilter.set(f)">{{ f === 'InProgress' ? 'Active' : f }}</button>
+        }
+      </div>
+
+      @if (loadingClasses()) {
+        <div class="state-box"><span class="spinner-border spinner-border-sm me-2"></span>Loading today's classes…</div>
+      } @else if (classesError()) {
+        <div class="state-box"><i class="bi bi-exclamation-triangle"></i>{{ classesError() }}
+          <div class="mt-2"><button class="btn btn-outline-navy btn-sm" type="button" (click)="loadClasses()">Retry</button></div>
+        </div>
+      } @else {
+        <ul class="list-unstyled m-0">
+          @for (c of filteredClasses(); track c.id) {
+            <li class="class-row" data-testid="upcoming-row">
+              <div class="time"><strong>{{ startTime(c) | date: 'hh:mm' }}</strong><span>{{ startTime(c) | date: 'a' }}</span></div>
+              <div class="flex-grow-1">
+                <div class="class-name" [innerHTML]="c.className | highlight: search.term()"></div>
+                <div class="text-muted-tf small">{{ c.studioName ?? 'No room' }} • {{ shortName(c.trainerName) }}</div>
+              </div>
+              <div class="text-muted-tf me-3 text-nowrap">{{ c.enrolled }}/{{ c.capacityLimit }} Enrolled</div>
+              <app-status-badge [status]="c.state === 'InProgress' ? 'Active' : c.state" />
+            </li>
+          } @empty {
+            <li class="state-box"><i class="bi bi-calendar-x"></i>
+              @if (upcoming().length === 0) { No more classes today at this branch. } @else { No class matches the search or filter. }
+            </li>
+          }
+        </ul>
+      }
+    </section>
+  </div>
+
+  <div class="col-xl-4">
+    <section class="tf-card h-100">
+      <div class="tf-card-header"><h2>Quick Actions</h2></div>
+      <div class="tf-card-body d-grid gap-3">
+        <button type="button" class="quick" (click)="newMember()" data-testid="qa-new-member">
+          <span class="quick-icon"><i class="bi bi-person-plus"></i></span>
+          <span><strong>New Member</strong><small>Start enrollment process</small></span>
+        </button>
+        <button type="button" class="quick" (click)="manualCheckIn()" data-testid="qa-checkin">
+          <span class="quick-icon"><i class="bi bi-qr-code-scan"></i></span>
+          <span><strong>Manual Check-in</strong><small>Verify member entry</small></span>
+        </button>
+        <button type="button" class="quick" (click)="registerClass()" data-testid="qa-register">
+          <span class="quick-icon"><i class="bi bi-calendar-check"></i></span>
+          <span><strong>Register Class</strong><small>Book member into session</small></span>
+        </button>
+      </div>
+    </section>
+  </div>
+</div>

@@ -1,6 +1,89 @@
-@TitanFitness.Api_HostAddress = http://localhost:5162
+# Titan Fitness API — run the "http" profile first (dotnet run --launch-profile http).
+# Visual Studio / Rider / VS Code REST Client: send "login" first; the other requests reuse its token.
 
-GET {{TitanFitness.Api_HostAddress}}/weatherforecast/
-Accept: application/json
+@host = http://localhost:5162
+
+# @name login
+POST {{host}}/api/auth/login
+Content-Type: application/json
+
+{ "userName": "manager", "password": "Manager@123" }
 
 ###
+@token = {{login.response.body.$.token}}
+
+### Who am I
+GET {{host}}/api/auth/me
+Authorization: Bearer {{token}}
+
+### Branches with studios
+GET {{host}}/api/branches
+Authorization: Bearer {{token}}
+
+### ---------- Dashboard (one endpoint per card) ----------
+GET {{host}}/api/dashboard/check-ins-today
+Authorization: Bearer {{token}}
+
+###
+GET {{host}}/api/dashboard/active-members
+Authorization: Bearer {{token}}
+
+###
+GET {{host}}/api/dashboard/upcoming-classes?take=5
+Authorization: Bearer {{token}}
+
+### ---------- Members ----------
+GET {{host}}/api/members?page=1&pageSize=10&sortBy=name&sortDirection=Asc
+Authorization: Bearer {{token}}
+
+###
+GET {{host}}/api/members?search=frozen&statuses=Frozen&statuses=Active
+Authorization: Bearer {{token}}
+
+### 400: invalid request contract
+POST {{host}}/api/members
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{ "fullName": "R2-D2", "homeBranchId": null }
+
+### ---------- Plans ----------
+GET {{host}}/api/plans?page=1&pageSize=10&sortBy=price&sortDirection=Desc&durations=1&durations=12&minPrice=50&maxPrice=1000&statuses=Published
+Authorization: Bearer {{token}}
+
+###
+GET {{host}}/api/plans/filter-options
+Authorization: Bearer {{token}}
+
+### 409: duplicate name
+POST {{host}}/api/plans
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{ "name": "Annual Pro", "price": 10, "durationInMonths": 1, "isPublished": true }
+
+### ---------- Trainers ----------
+GET {{host}}/api/trainers?page=1&pageSize=10&sortBy=branch&specialties=Cycling&statuses=Active
+Authorization: Bearer {{token}}
+
+###
+GET {{host}}/api/trainers/specialties
+Authorization: Bearer {{token}}
+
+### ---------- Classes ----------
+GET {{host}}/api/class-sessions?days=7
+Authorization: Bearer {{token}}
+
+###
+GET {{host}}/api/class-sessions/capacity-overview?days=1
+Authorization: Bearer {{token}}
+
+### 400 (branch required). Paste a real branchId from GET /api/branches to get 422 "The date must be today or later."
+POST {{host}}/api/class-sessions
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{ "className": "Past Class", "branchId": "00000000-0000-0000-0000-000000000000", "date": "2020-01-01", "startTime": "09:00:00", "durationInMinutes": 45 }
+
+### 401: no token
+GET {{host}}/api/members

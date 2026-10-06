@@ -1,0 +1,80 @@
+<div class="shell">
+  <aside class="sidebar" aria-label="Main menu">
+    <div class="brand">
+      <span class="brand-mark"><i class="bi bi-arrows-angle-expand"></i></span>
+      <div>
+        <div class="brand-name">Titan Fitness</div>
+        <div class="brand-sub">Staff Portal</div>
+      </div>
+    </div>
+
+    <button type="button" class="btn btn-light new-checkin" (click)="openCheckIn()" data-testid="nav-new-checkin">
+      <i class="bi bi-plus-lg me-1"></i> New Check-in
+    </button>
+
+    <nav class="nav-list">
+      @for (item of nav; track item.path) {
+        @if (!item.managerOnly || auth.isManager()) {
+          <a [routerLink]="item.path" routerLinkActive="active" class="nav-item-link">
+            <i class="bi" [class]="'bi ' + item.icon"></i>{{ item.label }}
+          </a>
+        }
+      }
+    </nav>
+
+    <div class="sidebar-foot">
+      <div class="small text-white-50">Signed in as</div>
+      <div class="text-white fw-semibold">{{ auth.session()?.displayName | titlecase }}</div>
+      <div class="small text-white-50">{{ auth.isManager() ? 'Branch manager' : 'Front desk' }}</div>
+    </div>
+  </aside>
+
+  <div class="main">
+    <header class="topbar">
+      <div class="branch-picker" (appClickOutside)="branchMenuOpen.set(false)">
+        <button type="button" class="branch-btn" (click)="branchMenuOpen.set(!branchMenuOpen())" data-testid="header-branch">
+          {{ branches.currentBranch()?.name ?? '…' }} Branch <i class="bi bi-chevron-down small"></i>
+        </button>
+        @if (branchMenuOpen()) {
+          <div class="row-menu-list branch-menu">
+            @for (b of branches.branches(); track b.id) {
+              <button type="button" (click)="chooseBranch(b.id)">
+                @if (b.id === branches.currentBranch()?.id) { <i class="bi bi-check2 me-1"></i> }{{ b.name }} Branch
+              </button>
+            }
+          </div>
+        }
+      </div>
+
+      @if (search.placeholder(); as placeholder) {
+        <label class="search-box">
+          <i class="bi bi-search"></i>
+          <input type="search" [placeholder]="placeholder" [value]="search.term()" (input)="search.type($any($event.target).value)"
+                 aria-label="Search" data-testid="header-search">
+        </label>
+      }
+
+      <div class="ms-auto d-flex align-items-center gap-2">
+        <button type="button" class="btn-icon" title="Notifications" aria-label="Notifications"><i class="bi bi-bell"></i></button>
+        <a routerLink="/classes" class="btn-icon d-inline-flex align-items-center justify-content-center" title="Class schedule" aria-label="Class schedule">
+          <i class="bi bi-calendar3"></i>
+        </a>
+        <div class="position-relative" (appClickOutside)="userMenuOpen.set(false)">
+          <button type="button" class="user-avatar" (click)="userMenuOpen.set(!userMenuOpen())" aria-label="Account" data-testid="user-menu">
+            {{ userInitials() }}
+          </button>
+          @if (userMenuOpen()) {
+            <div class="row-menu-list">
+              <div class="px-3 py-2 text-start small text-muted-tf">{{ auth.session()?.userName }}</div>
+              <button type="button" (click)="signOut()" data-testid="sign-out"><i class="bi bi-box-arrow-right me-1"></i> Sign out</button>
+            </div>
+          }
+        </div>
+      </div>
+    </header>
+
+    <main class="content">
+      <router-outlet />
+    </main>
+  </div>
+</div>

@@ -1,39 +1,44 @@
+using TitanFitness.Domain.Abstractions;
+
 namespace TitanFitness.Domain.Memberships;
 
-public sealed class GuestPass
+/// <summary>A one-visit pass for a guest, counted against the membership's guest pass quota.</summary>
+public sealed class GuestPass : Entity
 {
-    public Guid Id { get; private set; }
+    public const int GuestNameMaxLength = 100;
+
     public Guid MembershipId { get; private set; }
     public DateOnly IssuedOn { get; private set; }
     public DateOnly? UsedOn { get; private set; }
     public string? GuestName { get; private set; }
 
-    private GuestPass() { }
-
-    internal GuestPass(Guid membershipId, DateOnly issuedOn)
+    private GuestPass()
     {
-        if (membershipId == Guid.Empty)
-            throw new ArgumentException("Membership is required.", nameof(membershipId));
-
-        Id = Guid.CreateVersion7();
-        MembershipId = membershipId;
-        IssuedOn = issuedOn;
     }
+
+    internal static GuestPass Create(Guid membershipId, DateOnly issuedOn) => new()
+    {
+        Id = Guid.CreateVersion7(),
+        MembershipId = membershipId,
+        IssuedOn = issuedOn
+    };
 
     public bool IsUsed => UsedOn is not null;
 
-    internal void Use(DateOnly on, string? guestName)
+    internal Result Use(DateOnly on, string? guestName)
     {
         if (UsedOn is not null)
-            throw new InvalidOperationException("This guest pass has already been used.");
+            return Error.Conflict("GuestPass.AlreadyUsed", "This guest pass has already been used.");
 
         if (on < IssuedOn)
-            throw new ArgumentException("A guest pass cannot be used before it was issued.", nameof(on));
+            return Error.Validation("GuestPass.BeforeIssue", "A guest pass cannot be used before it was issued.");
 
-        if (guestName is not null && guestName.Trim().Length > 100)
-            throw new ArgumentException("Guest name cannot exceed 100 characters.", nameof(guestName));
+        var name = Guard.Optional(guestName, GuestNameMaxLength, "guestName", "Guest name");
+        if (name.IsFailure)
+            return name.Error;
 
         UsedOn = on;
-        GuestName = string.IsNullOrWhiteSpace(guestName) ? null : guestName.Trim();
+        GuestName = name.Value;
+        return Result.Success();
     }
 }

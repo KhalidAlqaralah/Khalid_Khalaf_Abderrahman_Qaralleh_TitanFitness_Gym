@@ -1,0 +1,7 @@
+.start-field { max-width: 380px; }
+.reason { max-width: 440px; }
+.impact-head { background: #f3f4f6; padding: 1.25rem 1.5rem; border-bottom: 1px solid var(--tf-line); }
+.impact-row { display: flex; justify-content: space-between; padding: .85rem 0; border-bottom: 1px solid var(--tf-line); color: var(--tf-muted); }
+.impact-row strong { color: var(--tf-ink); font-weight: 500; }
+.new-end { display: flex; justify-content: space-between; align-items: center; background: var(--tf-navy-100); border: 1px solid #c9d3ee; padding: 1rem; margin-top: 1rem; color: var(--tf-navy); font-weight: 600; }
+.new-end strong { font-size: 1.35rem; }

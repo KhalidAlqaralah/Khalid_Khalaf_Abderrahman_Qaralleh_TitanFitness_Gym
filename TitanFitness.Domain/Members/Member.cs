@@ -1,76 +1,138 @@
+using System.Text.RegularExpressions;
+using TitanFitness.Domain.Abstractions;
 using TitanFitness.Domain.ValueObjects;
 
 namespace TitanFitness.Domain.Members;
 
-public sealed class Member
+/// <summary>
+/// A person who has joined the gym. Being a member grants nothing on its own:
+/// access comes from holding a <see cref="Memberships.Membership"/>.
+/// </summary>
+public sealed partial class Member : AggregateRoot
 {
-    public Guid Id { get; private set; }
+    public const int NameMinLength = 2;
+    public const int NameMaxLength = 80;
+    public const int AddressMaxLength = 200;
+    public const int PhotoUrlMaxLength = 500;
+
     public MembershipNumber Number { get; private set; } = null!;
     public string FullName { get; private set; } = null!;
-    public string? Email { get; private set; }
+    public EmailAddress? Email { get; private set; }
     public string? Phone { get; private set; }
     public string? Address { get; private set; }
     public DateOnly JoinedOn { get; private set; }
     public string? PhotoUrl { get; private set; }
     public Guid HomeBranchId { get; private set; }
+    public string CreatedBy { get; private set; } = null!;
+    public DateTime CreatedAt { get; private set; }
 
-    private Member() { }
-
-    public Member(MembershipNumber number, string fullName, DateOnly joinedOn, Guid homeBranchId)
+    private Member()
     {
-        ArgumentNullException.ThrowIfNull(number);
-
-        if (homeBranchId == Guid.Empty)
-            throw new ArgumentException("Home branch is required.", nameof(homeBranchId));
-
-        Id = Guid.CreateVersion7();
-        Number = number;
-        JoinedOn = joinedOn;
-        HomeBranchId = homeBranchId;
-
-        Rename(fullName);
     }
 
-    public void Rename(string fullName)
+    public static Result<Member> Create(
+        MembershipNumber number,
+        string fullName,
+        Guid homeBranchId,
+        DateOnly joinedOn,
+        string createdBy,
+        DateTime createdAt,
+        string? email = null,
+        string? phone = null,
+        string? address = null)
     {
-        if (string.IsNullOrWhiteSpace(fullName))
-            throw new ArgumentException("Full name is required.", nameof(fullName));
+        var member = new Member
+        {
+            Id = Guid.CreateVersion7(),
+            Number = number,
+            JoinedOn = joinedOn,
+            CreatedBy = string.IsNullOrWhiteSpace(createdBy) ? "system" : createdBy.Trim(),
+            CreatedAt = createdAt
+        };
 
-        var trimmed = fullName.Trim();
+        var details = member.Update(fullName, homeBranchId);
+        if (details.IsFailure)
+            return details.Error;
 
-        if (trimmed.Length > 100)
-            throw new ArgumentException("Full name cannot exceed 100 characters.", nameof(fullName));
+        var contact = member.UpdateContactDetails(email, phone, address);
+        if (contact.IsFailure)
+            return contact.Error;
 
-        FullName = trimmed;
+        return member;
     }
 
-    public void UpdateContactDetails(string? email, string? phone, string? address)
+    /// <summary>Changes what the Edit Member dialog can change: the name and the home branch.</summary>
+    public Result Update(string fullName, Guid homeBranchId)
     {
-        Email = Optional(email, 100, nameof(email));
-        Phone = Optional(phone, 20, nameof(phone));
-        Address = Optional(address, 200, nameof(address));
+        var name = ValidateName(fullName);
+        if (name.IsFailure)
+            return name.Error;
+
+        var branch = Guard.RequiredId(homeBranchId, "homeBranchId", "Home branch");
+        if (branch.IsFailure)
+            return branch.Error;
+
+        FullName = name.Value;
+        HomeBranchId = branch.Value;
+        return Result.Success();
     }
 
-    public void SetPhoto(string? photoUrl) => PhotoUrl = Optional(photoUrl, 500, nameof(photoUrl));
-
-    public void TransferToBranch(Guid branchId)
+    public Result UpdateContactDetails(string? email, string? phone, string? address)
     {
-        if (branchId == Guid.Empty)
-            throw new ArgumentException("Home branch is required.", nameof(branchId));
+        var cleanEmail = EmailAddress.CreateOptional(email);
+        if (cleanEmail.IsFailure)
+            return cleanEmail.Error;
 
-        HomeBranchId = branchId;
+        var cleanPhone = Guard.OptionalPhone(phone, "phone");
+        if (cleanPhone.IsFailure)
+            return cleanPhone.Error;
+
+        var cleanAddress = Guard.Optional(address, AddressMaxLength, "address", "Address");
+        if (cleanAddress.IsFailure)
+            return cleanAddress.Error;
+
+        Email = cleanEmail.Value;
+        Phone = cleanPhone.Value;
+        Address = cleanAddress.Value;
+        return Result.Success();
     }
 
-    private static string? Optional(string? value, int maxLength, string field)
+    public Result SetPhoto(string? photoUrl)
     {
-        if (string.IsNullOrWhiteSpace(value))
-            return null;
+        var url = Guard.Optional(photoUrl, PhotoUrlMaxLength, "photoUrl", "Photo URL");
+        if (url.IsFailure)
+            return url.Error;
 
-        var trimmed = value.Trim();
-
-        if (trimmed.Length > maxLength)
-            throw new ArgumentException($"{field} cannot exceed {maxLength} characters.", field);
-
-        return trimmed;
+        PhotoUrl = url.Value;
+        return Result.Success();
     }
+
+    private static Result<string> ValidateName(string fullName)
+    {
+        var name = Guard.Required(fullName, NameMaxLength, "fullName", "Member name");
+        if (name.IsFailure)
+            return name;
+
+        var collapsed = Whitespace().Replace(name.Value, " ");
+
+        if (collapsed.Length < NameMinLength)
+            return Error.Validation("Member.NameTooShort", $"Member name must be at least {NameMinLength} characters.", "fullName");
+
+        if (!NamePattern().IsMatch(collapsed))
+            return Error.Validation("Member.NameInvalid",
+                "Member name can only contain letters, spaces, hyphens and apostrophes.", "fullName");
+
+        return collapsed;
+    }
+
+    [GeneratedRegex(@"\s+")]
+    private static partial Regex Whitespace();
+
+    [GeneratedRegex(@"^[\p{L}][\p{L}\s'\-]*$")]
+    private static partial Regex NamePattern();
+}
+
+public static class MemberErrors
+{
+    public static readonly Error NotFound = Error.NotFound("Member.NotFound", "The member was not found.");
 }

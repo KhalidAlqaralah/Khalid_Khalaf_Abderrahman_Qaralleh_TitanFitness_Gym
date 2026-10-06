@@ -1,0 +1,75 @@
+<button type="button" class="back-link mb-2" (click)="backToList()" data-testid="back-to-list"><i class="bi bi-arrow-left"></i> Back to list</button>
+
+<div class="d-flex flex-wrap align-items-start justify-content-between gap-3 mb-4">
+  <div>
+    <div class="d-flex align-items-center gap-3">
+      <h1>{{ mode() === 'add' ? 'New Trainer' : (trainer()?.name ?? 'Trainer') }}</h1>
+      <span class="tf-badge mode" data-testid="mode-badge"><span class="dot"></span>{{ badge() }}</span>
+    </div>
+    <p class="page-subtitle">{{ mode() === 'add' ? 'Add a trainer to the roster.' : 'Trainer #' + (trainer()?.code ?? '') }}</p>
+  </div>
+  @if (mode() === 'view' && trainer()) {
+    <button type="button" class="btn btn-navy" (click)="editInPlace()" data-testid="edit-trainer"><i class="bi bi-pencil me-1"></i> Edit Trainer</button>
+  }
+</div>
+
+@if (loading()) {
+  <div class="state-box"><span class="spinner-border spinner-border-sm me-2"></span>Loading trainer…</div>
+} @else if (notFound()) {
+  <div class="tf-card state-box" data-testid="trainer-not-found"><i class="bi bi-person-x"></i>Trainer not found.
+    <div class="mt-2"><button type="button" class="btn btn-outline-navy btn-sm" (click)="backToList()">Back to the directory</button></div>
+  </div>
+} @else {
+  <form [formGroup]="form" (ngSubmit)="save()" novalidate>
+    <section class="tf-card">
+      <div class="tf-card-header"><h2>Trainer Details</h2></div>
+      <div class="tf-card-body" [appAutofocus]="mode() !== 'view'">
+        <div class="row g-4">
+          <div class="col-md-6">
+            <label class="form-label" [class.req]="mode() !== 'view'" for="t-name">Trainer name</label>
+            <input id="t-name" class="form-control" formControlName="name" placeholder="e.g., Sarah Jenkins" maxlength="80" [class.is-invalid]="error('name')" data-testid="t-name">
+            @if (error('name'); as e) { <div class="invalid-feedback">{{ e }}</div> }
+          </div>
+          <div class="col-md-6">
+            <label class="form-label" for="t-specialty">Specialty</label>
+            <input id="t-specialty" class="form-control" formControlName="specialty" placeholder="e.g., HIIT / Strength" maxlength="100" [class.is-invalid]="error('specialty')">
+            @if (error('specialty'); as e) { <div class="invalid-feedback">{{ e }}</div> }
+          </div>
+          <div class="col-md-6">
+            <label class="form-label" [class.req]="mode() !== 'view'" for="t-branch">Branch</label>
+            <select id="t-branch" class="form-select" formControlName="branchId" [class.is-invalid]="error('branchId')" data-testid="t-branch">
+              <option value="" disabled>Select a branch</option>
+              @for (b of branches.branches(); track b.id) { <option [value]="b.id">{{ b.name }} Branch</option> }
+            </select>
+            @if (error('branchId'); as e) { <div class="invalid-feedback">{{ e }}</div> }
+          </div>
+          <div class="col-md-6">
+            <label class="form-label" [class.req]="mode() !== 'view'" for="t-email">Email</label>
+            <input id="t-email" type="email" class="form-control" formControlName="email" placeholder="name@titanfitness.com" [class.is-invalid]="error('email')" data-testid="t-email">
+            @if (error('email'); as e) { <div class="invalid-feedback" data-testid="t-email-error">{{ e }}</div> }
+          </div>
+          <div class="col-md-6">
+            <label class="form-label" for="t-phone">Phone</label>
+            <input id="t-phone" type="tel" class="form-control" formControlName="phone" placeholder="+1 (555) 000-0000" [class.is-invalid]="error('phone')" data-testid="t-phone">
+            @if (error('phone'); as e) { <div class="invalid-feedback">{{ e }}</div> }
+          </div>
+          <div class="col-md-6">
+            <span class="form-label d-block">Status</span>
+            <div class="form-check">
+              <input id="t-active" class="form-check-input" type="checkbox" formControlName="isActive" data-testid="t-active">
+              <label class="form-check-label" for="t-active">IsActive</label>
+            </div>
+            @if (mode() !== 'view') { <div class="form-hint">Ticked means true, unticked means false.</div> }
+          </div>
+        </div>
+      </div>
+    </section>
+
+    @if (mode() !== 'view') {
+      <div class="d-flex justify-content-end gap-2 mt-4">
+        <button type="button" class="btn btn-outline-navy" (click)="cancel()" data-testid="cancel">Cancel</button>
+        <button type="submit" class="btn btn-navy" [disabled]="saving()" data-testid="save">{{ mode() === 'add' ? 'Save Trainer' : 'Save Changes' }}</button>
+      </div>
+    }
+  </form>
+}

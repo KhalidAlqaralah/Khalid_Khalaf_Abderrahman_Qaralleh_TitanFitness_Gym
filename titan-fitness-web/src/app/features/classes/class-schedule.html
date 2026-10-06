@@ -1,0 +1,92 @@
+<div class="d-flex flex-wrap align-items-start justify-content-between gap-3 mb-4">
+  <div>
+    <h1>Class Schedule</h1>
+    <p class="page-subtitle" data-testid="schedule-subtitle">{{ subtitle() }}</p>
+  </div>
+  <div class="d-flex flex-wrap gap-2 align-items-center toolbar">
+    <select class="form-select" aria-label="Branch" [ngModel]="effectiveBranch()" (ngModelChange)="setBranch($event)" data-testid="schedule-branch">
+      <option value="">All Branches</option>
+      @for (b of branches.branches(); track b.id) { <option [value]="b.id">{{ b.name }}</option> }
+    </select>
+    <div class="input-group date-group">
+      <button type="button" class="btn btn-outline-navy" aria-label="Previous" (click)="shiftDate(-1)"><i class="bi bi-chevron-left"></i></button>
+      <input type="date" class="form-control" aria-label="Date" [value]="dateInput()" (change)="pickDate($any($event.target).value)" data-testid="schedule-date">
+      <button type="button" class="btn btn-outline-navy" aria-label="Next" (click)="shiftDate(1)"><i class="bi bi-chevron-right"></i></button>
+    </div>
+    <div class="btn-group" role="group" aria-label="View">
+      <button type="button" class="btn" [class.btn-navy]="view() === 'day'" [class.btn-outline-navy]="view() !== 'day'" (click)="view.set('day')">Day</button>
+      <button type="button" class="btn" [class.btn-navy]="view() === 'week'" [class.btn-outline-navy]="view() !== 'week'" (click)="view.set('week')" data-testid="view-week">Week</button>
+    </div>
+    <button type="button" class="btn btn-navy" (click)="addClass()" data-testid="add-class">Add Class</button>
+  </div>
+</div>
+
+@if (bookFor(); as m) {
+  <div class="alert alert-info d-flex align-items-center gap-2" data-testid="book-for-banner">
+    <i class="bi bi-person-check"></i>
+    <span>Booking for <strong>{{ m.fullName }}</strong> (#{{ m.membershipNumber }}) — choose a class and use <em>Book Session</em> in its ⋮ menu.</span>
+    <button type="button" class="btn btn-sm btn-outline-navy ms-auto" (click)="clearBookFor()">Done</button>
+  </div>
+}
+
+<div class="row g-4">
+  <div class="col-xl-8">
+    <section class="tf-card">
+      <div class="tf-card-header list-head">
+        <h2>{{ listTitle() }}</h2>
+        <span class="tf-badge grey" data-testid="class-count">{{ sessions().length }} {{ sessions().length === 1 ? 'Class' : 'Classes' }}</span>
+      </div>
+
+      @if (loading()) {
+        <div class="state-box"><span class="spinner-border spinner-border-sm me-2"></span>Loading the schedule…</div>
+      } @else if (error()) {
+        <div class="state-box"><i class="bi bi-exclamation-triangle"></i>{{ error() }}
+          <div class="mt-2"><button type="button" class="btn btn-outline-navy btn-sm" (click)="load()">Retry</button></div>
+        </div>
+      } @else {
+        @for (g of groups(); track g.date) {
+          @if (view() === 'week') { <div class="day-head">{{ g.label }}</div> }
+          @for (s of g.sessions; track s.id) {
+            <div class="session" [class.running]="s.state === 'InProgress'" [class.cancelled]="s.isCancelled" data-testid="session-row">
+              <div class="time" [title]="(startOf(s) | date: 'HH:mm') + '–' + (endOf(s) | date: 'HH:mm')">
+                <strong>{{ startOf(s) | date: 'hh:mm' }}</strong><span>{{ startOf(s) | date: 'a' }}</span>
+              </div>
+              <div class="flex-grow-1 min-w-0">
+                <button type="button" class="session-name" (click)="onAction('view', s)">
+                  <span [innerHTML]="s.className | highlight: search.term()"></span>
+                  @if (nearlyFull(s)) { <span class="hot-dot" title="90% full or more" data-testid="hot-dot"></span> }
+                </button>
+                <div class="meta">
+                  <span><i class="bi bi-person"></i> <span [innerHTML]="(s.trainerName ?? 'No trainer') | highlight: search.term()"></span></span>
+                  <span class="sep">•</span>
+                  <span><i class="bi bi-geo-alt"></i> <span [innerHTML]="(s.studioName ?? 'No room') | highlight: search.term()"></span></span>
+                  @if (allBranches()) { <span class="sep">•</span><span><i class="bi bi-building"></i> {{ s.branchName }}</span> }
+                  @if (view() === 'week') { <span class="sep">•</span><span>{{ startOf(s) | date: 'HH:mm' }}–{{ endOf(s) | date: 'HH:mm' }}</span> }
+                </div>
+              </div>
+              <app-status-badge [status]="s.state" />
+              <div class="enrolment">
+                <div class="fw-bold text-end">{{ s.enrolled }} / {{ s.capacityLimit }}</div>
+                <div class="fill-bar" [class.hot]="nearlyFull(s) && s.state !== 'Full'" [class.full]="s.state === 'Full'"><span [style.width.%]="fillPercent(s)"></span></div>
+                @if (s.waitlist > 0) { <div class="small text-muted-tf text-end" data-testid="waitlist">Waitlist: {{ s.waitlist }}</div> }
+              </div>
+              <app-row-menu [items]="menuFor(s)" [rowLabel]="s.className" (selected)="onAction($event, s)" />
+            </div>
+          }
+        } @empty {
+          <div class="state-box"><i class="bi bi-calendar-x"></i>No classes scheduled for this {{ view() === 'week' ? 'week' : 'day' }}{{ search.term() ? ' that match the search' : '' }}.</div>
+        }
+      }
+    </section>
+  </div>
+
+  <div class="col-xl-4">
+    <section class="tf-card">
+      <div class="tf-card-header"><h2>Capacity Overview</h2></div>
+      <div class="tf-card-body row g-3">
+        <div class="col-6"><div class="stat"><i class="bi bi-people"></i><strong data-testid="total-bookings">{{ overview()?.totalBookings ?? '—' }}</strong><span>Total Bookings</span></div></div>
+        <div class="col-6"><div class="stat"><i class="bi bi-calendar-check"></i><strong data-testid="fill-rate">{{ overview() ? (overview()!.averageFillRate | percent: '1.0-0') : '—' }}</strong><span>Avg Fill Rate</span></div></div>
+      </div>
+    </section>
+  </div>
+</div>

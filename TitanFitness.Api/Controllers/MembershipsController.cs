@@ -1,142 +1,60 @@
 using MediatR;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using TitanFitness.Application.Memberships.CancelMembership;
-using TitanFitness.Application.Memberships.ChangePlan;
-using TitanFitness.Application.Memberships.FreezeMembership;
-using TitanFitness.Application.Memberships.GetMembership;
-using TitanFitness.Application.Memberships.IssueGuestPass;
-using TitanFitness.Application.Memberships.PreviewFreeze;
-using TitanFitness.Application.Memberships.PurchaseMembership;
-using TitanFitness.Application.Memberships.RenewMembership;
-using TitanFitness.Application.Memberships.UseGuestPass;
-using TitanFitness.Application.Memberships.EndFreezeEarly;
+using TitanFitness.Api.Auth;
+using TitanFitness.Api.Common;
+using TitanFitness.Application.Features.Memberships.Commands.CancelMembership;
+using TitanFitness.Application.Features.Memberships.Commands.EndFreezeEarly;
+using TitanFitness.Application.Features.Memberships.Commands.FreezeMembership;
+using TitanFitness.Application.Features.Memberships.Commands.IssueGuestPass;
+using TitanFitness.Application.Features.Memberships.Commands.PurchaseMembership;
+using TitanFitness.Application.Features.Memberships.Commands.RenewMembership;
+using TitanFitness.Application.Features.Memberships.Commands.UseGuestPass;
+using TitanFitness.Application.Features.Memberships.Contracts;
+using TitanFitness.Application.Features.Memberships.Queries.GetMembershipById;
 
 namespace TitanFitness.Api.Controllers;
 
 [ApiController]
 [Route("api/memberships")]
+[Authorize(Policy = Policies.Staff)]
 public sealed class MembershipsController(ISender sender) : ControllerBase
 {
-    [HttpPost]
-    [ProducesResponseType(StatusCodes.Status201Created)]
-    [ProducesResponseType(StatusCodes.Status400BadRequest)]
-    [ProducesResponseType(StatusCodes.Status404NotFound)]
-    [ProducesResponseType(StatusCodes.Status409Conflict)]
-    public async Task<IActionResult> Purchase(PurchaseMembershipCommand command, CancellationToken ct)
-    {
-        var id = await sender.Send(command, ct);
-        return Created($"/api/memberships/{id}", new { id });
-    }
-
     [HttpGet("{id:guid}")]
-    [ProducesResponseType(StatusCodes.Status200OK)]
-    [ProducesResponseType(StatusCodes.Status404NotFound)]
-    public async Task<IActionResult> Get(Guid id, CancellationToken ct)
-        => Ok(await sender.Send(new GetMembershipQuery(id), ct));
+    public async Task<IActionResult> GetById(Guid id, CancellationToken cancellationToken) =>
+        this.FromResult(await sender.Send(new GetMembershipByIdQuery(id), cancellationToken));
 
-    [HttpGet("{id:guid}/freezes/preview")]
-    [ProducesResponseType(StatusCodes.Status200OK)]
-    [ProducesResponseType(StatusCodes.Status404NotFound)]
-    public async Task<IActionResult> PreviewFreeze(
-        Guid id,
-        [FromQuery] DateOnly startDate,
-        [FromQuery] int durationInMonths,
-        CancellationToken ct)
-        => Ok(await sender.Send(new PreviewFreezeQuery(id, startDate, durationInMonths), ct));
-
-    [HttpPost("{id:guid}/freezes")]
-    [ProducesResponseType(StatusCodes.Status201Created)]
-    [ProducesResponseType(StatusCodes.Status400BadRequest)]
-    [ProducesResponseType(StatusCodes.Status404NotFound)]
-    [ProducesResponseType(StatusCodes.Status409Conflict)]
-    public async Task<IActionResult> Freeze(Guid id, FreezeMembershipRequest request, CancellationToken ct)
-    {
-        var freezeId = await sender.Send(
-            new FreezeMembershipCommand(id, request.StartDate, request.DurationInMonths, request.Reason, request.Notes),
-            ct);
-
-        return Created($"/api/memberships/{id}/freezes/{freezeId}", new { id = freezeId });
-    }
-
-    [HttpPost("{id:guid}/freezes/{freezeId:guid}/end")]
-    [ProducesResponseType(StatusCodes.Status204NoContent)]
-    [ProducesResponseType(StatusCodes.Status404NotFound)]
-    [ProducesResponseType(StatusCodes.Status409Conflict)]
-    public async Task<IActionResult> EndFreezeEarly(
-        Guid id, Guid freezeId, EndFreezeEarlyRequest request, CancellationToken ct)
-    {
-        await sender.Send(new EndFreezeEarlyCommand(id, freezeId, request.EndedOn), ct);
-        return NoContent();
-    }
-
-    [HttpPost("{id:guid}/guest-passes")]
-    [ProducesResponseType(StatusCodes.Status201Created)]
-    [ProducesResponseType(StatusCodes.Status404NotFound)]
-    [ProducesResponseType(StatusCodes.Status409Conflict)]
-    public async Task<IActionResult> IssueGuestPass(Guid id, CancellationToken ct)
-    {
-        var passId = await sender.Send(new IssueGuestPassCommand(id), ct);
-        return Created($"/api/memberships/{id}/guest-passes/{passId}", new { id = passId });
-    }
-
-    [HttpPost("{id:guid}/guest-passes/{passId:guid}/use")]
-    [ProducesResponseType(StatusCodes.Status204NoContent)]
-    [ProducesResponseType(StatusCodes.Status404NotFound)]
-    [ProducesResponseType(StatusCodes.Status409Conflict)]
-    public async Task<IActionResult> UseGuestPass(
-        Guid id, Guid passId, UseGuestPassRequest request, CancellationToken ct)
-    {
-        await sender.Send(new UseGuestPassCommand(id, passId, request.GuestName), ct);
-        return NoContent();
-    }
-
-    [HttpGet("{id:guid}/plan-changes/preview")]
-    [ProducesResponseType(StatusCodes.Status200OK)]
-    [ProducesResponseType(StatusCodes.Status404NotFound)]
-    public async Task<IActionResult> PreviewPlanChange(
-        Guid id,
-        [FromQuery] Guid newPlanId,
-        [FromQuery] PlanChangeTiming timing,
-        CancellationToken ct)
-        => Ok(await sender.Send(new PreviewPlanChangeQuery(id, newPlanId, timing), ct));
-
-    [HttpPost("{id:guid}/plan-changes")]
-    [ProducesResponseType(StatusCodes.Status201Created)]
-    [ProducesResponseType(StatusCodes.Status404NotFound)]
-    [ProducesResponseType(StatusCodes.Status409Conflict)]
-    public async Task<IActionResult> ChangePlan(Guid id, ChangePlanRequest request, CancellationToken ct)
-    {
-        var newId = await sender.Send(
-            new ChangeMembershipPlanCommand(id, request.NewPlanId, request.Timing), ct);
-
-        return Created($"/api/memberships/{newId}", new { id = newId });
-    }
+    /// <summary>Sells a published plan to a member from a start date (today or later).</summary>
+    [HttpPost]
+    public async Task<IActionResult> Purchase(PurchaseMembershipRequest request, CancellationToken cancellationToken) =>
+        this.Created(await sender.Send(new PurchaseMembershipCommand(request.MemberId!.Value, request.PlanId!.Value, request.StartDate!.Value),
+            cancellationToken), nameof(GetById), created => new { id = created.Id });
 
     [HttpPost("{id:guid}/renewals")]
-    [ProducesResponseType(StatusCodes.Status201Created)]
-    [ProducesResponseType(StatusCodes.Status404NotFound)]
-    [ProducesResponseType(StatusCodes.Status409Conflict)]
-    public async Task<IActionResult> Renew(Guid id, RenewRequest request, CancellationToken ct)
-    {
-        var newId = await sender.Send(new RenewMembershipCommand(id, request.PlanId), ct);
-        return Created($"/api/memberships/{newId}", new { id = newId });
-    }
+    public async Task<IActionResult> Renew(Guid id, RenewMembershipRequest request, CancellationToken cancellationToken) =>
+        this.Created(await sender.Send(new RenewMembershipCommand(id, request.PlanId), cancellationToken),
+            nameof(GetById), created => new { id = created.Id });
 
-    [HttpDelete("{id:guid}")]
-    [ProducesResponseType(StatusCodes.Status204NoContent)]
-    [ProducesResponseType(StatusCodes.Status404NotFound)]
-    [ProducesResponseType(StatusCodes.Status409Conflict)]
-    public async Task<IActionResult> Cancel(Guid id, CancellationToken ct)
-    {
-        await sender.Send(new CancelMembershipCommand(id), ct);
-        return NoContent();
-    }
+    /// <summary>Cancels the membership. Final: it cannot be resumed.</summary>
+    [HttpPost("{id:guid}/cancel")]
+    public async Task<IActionResult> Cancel(Guid id, CancellationToken cancellationToken) =>
+        this.FromResult(await sender.Send(new CancelMembershipCommand(id), cancellationToken));
+
+    /// <summary>Freeze Membership → Confirm Freeze.</summary>
+    [HttpPost("{id:guid}/freezes")]
+    public async Task<IActionResult> Freeze(Guid id, FreezeMembershipRequest request, CancellationToken cancellationToken) =>
+        this.FromResult(await sender.Send(new FreezeMembershipCommand(id, request.StartDate!.Value, request.DurationInMonths!.Value,
+            request.Reason!.Value, request.Notes), cancellationToken));
+
+    [HttpPost("{id:guid}/freezes/{freezeId:guid}/end")]
+    public async Task<IActionResult> EndFreeze(Guid id, Guid freezeId, EndFreezeRequest request, CancellationToken cancellationToken) =>
+        this.FromResult(await sender.Send(new EndFreezeEarlyCommand(id, freezeId, request.EndedOn!.Value), cancellationToken));
+
+    [HttpPost("{id:guid}/guest-passes")]
+    public async Task<IActionResult> IssueGuestPass(Guid id, CancellationToken cancellationToken) =>
+        this.FromResult(await sender.Send(new IssueGuestPassCommand(id), cancellationToken));
+
+    [HttpPost("{id:guid}/guest-passes/{passId:guid}/use")]
+    public async Task<IActionResult> UseGuestPass(Guid id, Guid passId, UseGuestPassRequest request, CancellationToken cancellationToken) =>
+        this.FromResult(await sender.Send(new UseGuestPassCommand(id, passId, request.GuestName), cancellationToken));
 }
-
-public sealed record UseGuestPassRequest(string? GuestName);
-
-public sealed record ChangePlanRequest(Guid NewPlanId, PlanChangeTiming Timing);
-
-public sealed record RenewRequest(Guid? PlanId);
-
-public sealed record EndFreezeEarlyRequest(DateOnly EndedOn);

@@ -1,0 +1,66 @@
+<div class="dialog-header">
+  <h2>New Check-in</h2>
+  <button type="button" class="btn-icon" aria-label="Close" (click)="close()"><i class="bi bi-x-lg"></i></button>
+</div>
+
+<form [formGroup]="form" (ngSubmit)="save()" novalidate>
+  <div class="dialog-body" appAutofocus>
+    <div class="mb-3">
+      <label class="form-label req" for="checkin-member">Member</label>
+      <app-member-picker [(member)]="member" [locked]="locked" [invalid]="!!memberError()" inputId="checkin-member" />
+      @if (memberError(); as message) { <div class="invalid-feedback" data-testid="member-error">{{ message }}</div> }
+    </div>
+
+    <div class="row g-3">
+      <div class="col-sm-6">
+        <label class="form-label req" for="checkin-date">Check-in date</label>
+        <mat-form-field appearance="outline" subscriptSizing="dynamic">
+          <input matInput id="checkin-date" [matDatepicker]="dp" formControlName="date" [min]="minDate" [max]="maxDate" placeholder="mm/dd/yyyy">
+          <mat-datepicker-toggle matIconSuffix [for]="dp" />
+          <mat-datepicker #dp />
+          @if (form.controls.date.hasError('required')) { <mat-error>Date is required.</mat-error> }
+          @if (form.controls.date.hasError('matDatepickerMax')) { <mat-error>The date cannot be in the future.</mat-error> }
+          @if (form.controls.date.hasError('matDatepickerMin')) { <mat-error>The date cannot be more than 7 days ago.</mat-error> }
+          @if (form.controls.date.hasError('server')) { <mat-error>{{ form.controls.date.getError('server') }}</mat-error> }
+        </mat-form-field>
+      </div>
+      <div class="col-sm-6">
+        <label class="form-label req" for="checkin-time">Check-in time</label>
+        <mat-form-field appearance="outline" subscriptSizing="dynamic">
+          <input matInput id="checkin-time" [matTimepicker]="tp" formControlName="time" placeholder="hh:mm AM">
+          <mat-timepicker-toggle matIconSuffix [for]="tp" />
+          <mat-timepicker #tp interval="5m" />
+          @if (form.controls.time.hasError('required')) { <mat-error>Time is required.</mat-error> }
+          @if (form.controls.time.hasError('matTimepickerParse')) { <mat-error>Enter a time like 08:30 AM.</mat-error> }
+          @if (form.controls.time.hasError('server')) { <mat-error>{{ form.controls.time.getError('server') }}</mat-error> }
+        </mat-form-field>
+      </div>
+    </div>
+    @if (form.hasError('future') && (form.controls.date.touched || form.controls.time.touched)) {
+      <div class="invalid-feedback" data-testid="future-error">The check-in date and time cannot be in the future.</div>
+    }
+
+    <div class="mt-3">
+      <label class="form-label" for="checkin-branch">Branch</label>
+      <input id="checkin-branch" class="form-control" [value]="(branches.currentBranch()?.name ?? '') + ' Branch'" readonly disabled>
+    </div>
+
+    <div class="mt-3">
+      <label class="form-label" for="checkin-notes">Notes</label>
+      <textarea id="checkin-notes" class="form-control" rows="3" formControlName="notes" maxlength="250"
+                [class.is-invalid]="form.controls.notes.invalid"></textarea>
+      <div class="char-count">{{ form.controls.notes.value?.length ?? 0 }} / 250</div>
+    </div>
+
+    @if (serverError(); as message) {
+      <div class="alert alert-danger py-2 small mt-2 mb-0" role="alert" data-testid="checkin-error">{{ message }}</div>
+    }
+  </div>
+
+  <div class="dialog-footer">
+    <button type="button" class="btn btn-outline-navy" (click)="close()">Cancel</button>
+    <button type="submit" class="btn btn-navy" [disabled]="saving()" data-testid="checkin-save">
+      <i class="bi bi-box-arrow-in-right me-1"></i> Save Check-in
+    </button>
+  </div>
+</form>

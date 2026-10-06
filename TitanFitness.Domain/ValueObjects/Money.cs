@@ -1,25 +1,28 @@
+using TitanFitness.Domain.Abstractions;
+
 namespace TitanFitness.Domain.ValueObjects;
 
+/// <summary>
+/// A non-negative amount with at most two decimal places.
+/// </summary>
 public sealed record Money
 {
-    public decimal Amount { get; private set; }
+    public decimal Amount { get; private init; }
 
-    private Money() { }
+    private Money(decimal amount) => Amount = amount;
 
-    public Money(decimal amount)
+    public static Money Zero { get; } = new(0m);
+
+    public static Result<Money> Create(decimal amount, string field = "price")
     {
         if (amount < 0)
-            throw new ArgumentException("Money cannot be negative.", nameof(amount));
+            return Error.Validation("Money.Negative", "Price cannot be negative.", field);
 
         if (decimal.Round(amount, 2) != amount)
-            throw new ArgumentException("Money cannot have more than 2 decimal places.", nameof(amount));
+            return Error.Validation("Money.Precision", "Price cannot have more than 2 decimal places.", field);
 
-        Amount = amount;
+        return new Money(amount);
     }
-
-    public static Money Zero => new(0m);
-
-    public static Money operator +(Money left, Money right) => new(left.Amount + right.Amount);
 
     public override string ToString() => Amount.ToString("0.00");
 }

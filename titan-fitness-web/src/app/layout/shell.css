@@ -1,0 +1,30 @@
+.shell { display: flex; min-height: 100vh; }
+.sidebar { width: var(--tf-sidebar); background: var(--tf-navy); color: #c9d3ee; display: flex; flex-direction: column; position: fixed; inset: 0 auto 0 0; z-index: 20; }
+.brand { display: flex; align-items: center; gap: .75rem; padding: 1.25rem 1.25rem 1rem; }
+.brand-mark { width: 40px; height: 40px; border-radius: 10px; background: rgba(255,255,255,.12); display: inline-flex; align-items: center; justify-content: center; color: #fff; font-size: 1.1rem; }
+.brand-name { color: #fff; font-weight: 700; font-size: 1.15rem; line-height: 1.1; }
+.brand-sub { font-size: .75rem; letter-spacing: .08em; text-transform: uppercase; color: #9fb0dc; }
+.new-checkin { margin: .5rem 1.25rem 1.25rem; color: var(--tf-navy); font-weight: 700; border-radius: 4px; }
+.nav-list { display: flex; flex-direction: column; }
+.nav-item-link { color: #c9d3ee; text-decoration: none; padding: .8rem 1.5rem; display: flex; gap: .85rem; align-items: center; border-left: 4px solid transparent; }
+.nav-item-link:hover { background: rgba(255,255,255,.06); color: #fff; }
+.nav-item-link.active { background: rgba(255,255,255,.12); color: #fff; border-left-color: #fff; font-weight: 600; }
+.sidebar-foot { margin-top: auto; padding: 1.25rem; border-top: 1px solid rgba(255,255,255,.1); }
+.main { flex: 1; margin-left: var(--tf-sidebar); min-width: 0; }
+.topbar { height: 64px; background: #fff; border-bottom: 1px solid var(--tf-line); display: flex; align-items: center; gap: 1.5rem; padding: 0 2rem; position: sticky; top: 0; z-index: 10; }
+.branch-picker { position: relative; }
+.branch-btn { border: 0; background: none; color: var(--tf-navy); font-weight: 700; font-size: 1.15rem; padding: 0; }
+.branch-menu { left: 0; right: auto; text-align: left; }
+.branch-menu button { text-align: left; }
+.search-box { display: flex; align-items: center; gap: .5rem; background: var(--tf-bg); border: 1px solid var(--tf-line); border-radius: 4px; padding: .45rem .75rem; width: 320px; margin: 0; }
+.search-box input { border: 0; background: transparent; outline: none; width: 100%; }
+.user-avatar { width: 36px; height: 36px; border-radius: 50%; border: 1px solid var(--tf-line); background: var(--tf-navy-100); color: var(--tf-navy); font-weight: 700; font-size: .8rem; }
+.content { padding: 2rem 2.25rem 3rem; max-width: 1400px; }
+@media (max-width: 900px) {
+  .sidebar { position: static; width: 100%; }
+  .shell { flex-direction: column; }
+  .main { margin-left: 0; }
+  .topbar { padding: 0 1rem; gap: .75rem; }
+  .search-box { width: auto; flex: 1; }
+  .content { padding: 1rem; }
+}

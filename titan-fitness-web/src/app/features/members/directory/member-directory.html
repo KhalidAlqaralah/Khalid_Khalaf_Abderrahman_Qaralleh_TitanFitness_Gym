@@ -1,0 +1,37 @@
+<div class="d-flex flex-wrap align-items-start justify-content-between gap-3 mb-4">
+  <div>
+    <h1>Member Directory</h1>
+    <p class="page-subtitle">Manage and view all registered members.</p>
+  </div>
+  <div class="d-flex gap-2">
+    <button type="button" class="btn btn-outline-navy" (click)="openFilters()" data-testid="members-filter">
+      <i class="bi bi-funnel me-1"></i> Filter
+      @if (activeFilterCount() > 0) { <span class="badge text-bg-primary ms-1">{{ activeFilterCount() }}</span> }
+    </button>
+    <button type="button" class="btn btn-navy" (click)="addMember()" data-testid="add-member"><i class="bi bi-plus-lg me-1"></i> Add Member</button>
+  </div>
+</div>
+
+<div class="tf-card">
+  <app-data-table [columns]="columns" [rows]="rows()" [sort]="sort()" [loading]="loading()" [error]="error()"
+                  (sortChange)="onSort($event)" (retry)="load()" emptyText="No member matches the current search and filters.">
+    <ng-template #row let-m>
+      <tr data-testid="member-row">
+        <td>
+          <button type="button" class="d-flex align-items-center gap-3 border-0 bg-transparent p-0 text-start" (click)="onAction('view', m)">
+            <span class="avatar">{{ initialsOf(m.fullName) }}</span>
+            <span class="fw-medium" [innerHTML]="m.fullName | highlight: search.term()"></span>
+          </button>
+        </td>
+        <td class="text-muted-tf" [innerHTML]="'#' + m.membershipNumber | highlight: search.term()"></td>
+        <td><app-status-badge [status]="m.status" /></td>
+        <td [innerHTML]="m.branchName | highlight: search.term()"></td>
+        <td data-testid="last-visit">{{ m.lastVisit | relativeDay }}</td>
+        <td class="text-end">
+          <app-row-menu [items]="menuFor(m)" [rowLabel]="m.fullName" (selected)="onAction($event, m)" />
+        </td>
+      </tr>
+    </ng-template>
+  </app-data-table>
+  <app-paginator [total]="total()" [page]="page()" [pageSize]="10" (pageChange)="page.set($event)" />
+</div>

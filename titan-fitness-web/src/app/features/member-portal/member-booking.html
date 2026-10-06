@@ -1,0 +1,64 @@
+<div class="d-flex align-items-center gap-3 mb-3">
+  <button type="button" class="btn-icon" aria-label="Back" (click)="back()"><i class="bi bi-arrow-left"></i></button>
+  <h1 class="h4 m-0 text-navy">Class Booking</h1>
+</div>
+<nav class="small mb-3" aria-label="Breadcrumb"><a routerLink="/member/classes" class="text-muted-tf text-decoration-none">Classes</a> <i class="bi bi-chevron-right mx-1 small"></i> Booking</nav>
+
+@if (notFound()) {
+  <div class="tf-card state-box" data-testid="class-not-found"><i class="bi bi-calendar-x"></i>Class not found.</div>
+} @else if (session(); as s) {
+  <article class="tf-card p-4">
+    <h2 class="class-title">{{ s.className }}</h2>
+    <div class="text-muted-tf fs-5"><i class="bi bi-clock me-2"></i>{{ isToday() ? 'Today' : (start() | date: 'EEE, MMM d') }}, {{ start() | date: 'h:mm a' }} - {{ end() | date: 'h:mm a' }}</div>
+    <hr>
+    <div class="d-flex gap-5">
+      <div class="d-flex gap-2"><i class="bi bi-person fs-5"></i><div><div class="label">Trainer</div>{{ s.trainerName ?? 'TBA' }}</div></div>
+      <div class="d-flex gap-2"><i class="bi bi-door-open fs-5"></i><div><div class="label">Studio</div>{{ s.studioName ?? 'TBA' }}</div></div>
+    </div>
+    <hr>
+    <div class="row g-3">
+      <div class="col-sm-6">
+        <div class="box">
+          <div class="label">Availability</div>
+          <div><span class="fs-4 fw-bold me-2" data-testid="spots-left">{{ s.remainingPlaces }}</span>spots left ({{ s.enrolled }}/{{ s.capacityLimit }} booked)</div>
+          <div class="fill-bar mt-2"><span [style.width.%]="fill()"></span></div>
+          @if (s.remainingPlaces === 0) { <div class="small text-muted-tf mt-1">Full — booking adds you to the waitlist.</div> }
+        </div>
+      </div>
+      <div class="col-sm-6">
+        <div class="box">
+          <div class="label">Eligibility Status</div>
+          @if (eligibility(); as e) {
+            <div class="d-flex gap-3 align-items-center" data-testid="eligibility">
+              <span class="elig-icon" [class.bad]="!e.eligible"><i class="bi" [class]="e.eligible ? 'bi bi-check-circle-fill' : 'bi bi-x-circle-fill'"></i></span>
+              <div><div class="fw-semibold">{{ e.title }}</div><div class="small text-muted-tf">{{ e.detail }}</div></div>
+            </div>
+          }
+        </div>
+      </div>
+    </div>
+
+    @if (result(); as r) {
+      <div class="alert alert-success mt-4 mb-0" data-testid="booking-done">
+        <i class="bi bi-check2-circle me-1"></i>
+        @if (r.status === 'Waitlisted') { You're on the waitlist (#{{ r.waitlistPosition }}). We'll confirm your place if one frees up. }
+        @else { You're booked! See you at {{ s.className }}. }
+      </div>
+    } @else if (eligibility()?.existingBooking; as existing) {
+      <div class="alert alert-info mt-4 mb-0" data-testid="already-booked">You already hold a place on this class ({{ existing }}).</div>
+    } @else {
+      <label class="form-label mt-4" for="trainer-notes">Notes for the Trainer (Optional)</label>
+      <div class="small text-muted-tf mb-2">Include any injuries, required modifications, or equipment needs.</div>
+      <textarea id="trainer-notes" class="form-control" rows="3" maxlength="500" [(ngModel)]="note"
+                placeholder="e.g., Recovering from mild shoulder strain, need alternative exercises."></textarea>
+      @if (error(); as e) { <div class="alert alert-danger py-2 small mt-2 mb-0">{{ e }}</div> }
+      <hr>
+      <div class="d-flex justify-content-end gap-2">
+        <button type="button" class="btn btn-outline-navy" (click)="back()">Cancel</button>
+        <button type="button" class="btn btn-navy" [disabled]="!bookable() || saving()" (click)="confirm()" data-testid="member-confirm">Confirm Booking <i class="bi bi-check-lg ms-1"></i></button>
+      </div>
+    }
+  </article>
+} @else {
+  <div class="state-box"><span class="spinner-border spinner-border-sm me-2"></span>Loading class…</div>
+}

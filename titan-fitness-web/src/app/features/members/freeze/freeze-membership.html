@@ -1,0 +1,107 @@
+<a [routerLink]="['/members', id()]" class="back-link mb-2"><i class="bi bi-arrow-left"></i> Back to Member Profile</a>
+<h1>Freeze Membership</h1>
+<p class="page-subtitle pb-3 border-bottom mb-4">Temporarily suspend a membership contract.</p>
+
+@if (loading()) {
+  <div class="state-box"><span class="spinner-border spinner-border-sm me-2"></span>Loading membership…</div>
+} @else if (notFound()) {
+  <div class="tf-card state-box" data-testid="member-not-found"><i class="bi bi-person-x"></i>Member not found.</div>
+} @else {
+  <form [formGroup]="form" (ngSubmit)="confirm()" novalidate>
+    <div class="row g-4">
+      <div class="col-lg-8 d-grid gap-4 align-content-start">
+        <section class="tf-card p-4 d-flex gap-4 align-items-center">
+          <span class="avatar avatar-lg">{{ initialsOf(member()?.fullName ?? '?') }}</span>
+          <div>
+            <h2 class="h5 fw-bold mb-1" data-testid="freeze-member">{{ member()?.fullName }}</h2>
+            <div class="text-muted-tf">ID: {{ member()?.membershipNumber }} • {{ membership()?.planName ?? 'No current plan' }}</div>
+            <div class="d-flex align-items-center gap-3 mt-2">
+              <app-status-badge [status]="membership()?.status ?? 'None'" />
+              @if (membership(); as m) { <span class="text-muted-tf">Current End Date: <span data-testid="current-end">{{ m.endDate | date: 'MMM d, y' }}</span></span> }
+            </div>
+          </div>
+        </section>
+
+        @if (!canFreeze()) {
+          <div class="alert alert-warning m-0" role="alert" data-testid="freeze-readonly">
+            <i class="bi bi-info-circle me-1"></i>
+            This membership can't be frozen: {{ membership()?.cannotFreezeReason ?? 'the member has no active membership.' }}
+          </div>
+        }
+
+        <section class="tf-card p-4">
+          <h2 class="h4 fw-bold pb-3 border-bottom mb-3">Freeze Parameters</h2>
+
+          <label class="form-label d-block req" for="freeze-start">Start Date</label>
+          <mat-form-field appearance="outline" subscriptSizing="dynamic" class="start-field">
+            <i class="bi bi-calendar3 me-2 text-muted-tf" matIconPrefix></i>
+            <input matInput id="freeze-start" [matDatepicker]="dp" formControlName="startDate" [min]="minDate" placeholder="mm/dd/yyyy" data-testid="freeze-start">
+            <mat-datepicker-toggle matIconSuffix [for]="dp" />
+            <mat-datepicker #dp />
+            @if (form.controls.startDate.hasError('required')) { <mat-error>Start date is required.</mat-error> }
+            @if (form.controls.startDate.hasError('past') || form.controls.startDate.hasError('matDatepickerMin')) { <mat-error>The freeze must start today or later.</mat-error> }
+            @if (form.controls.startDate.hasError('afterEnd')) { <mat-error>The freeze must start before the current end date.</mat-error> }
+            @if (form.controls.startDate.hasError('overlap')) { <mat-error>This overlaps a freeze that is already scheduled.</mat-error> }
+            @if (form.controls.startDate.hasError('server')) { <mat-error>{{ form.controls.startDate.getError('server') }}</mat-error> }
+          </mat-form-field>
+
+          <span class="form-label d-block mt-3 req">Duration (Months)</span>
+          <div class="choice-cards" role="radiogroup" aria-label="Duration">
+            @for (months of durations; track months; let i = $index) {
+              <span [matTooltip]="optionTooltip(i)">
+                <button type="button" class="choice-card" role="radio" [attr.aria-checked]="form.controls.durationInMonths.value === months"
+                        [class.selected]="form.controls.durationInMonths.value === months" [disabled]="optionDisabled(i)"
+                        (click)="chooseDuration(months, i)" [attr.data-testid]="'duration-' + months">
+                  {{ months }} {{ months === 1 ? 'Month' : 'Months' }}
+                </button>
+              </span>
+            }
+          </div>
+          @if (form.controls.durationInMonths.touched && form.controls.durationInMonths.invalid) {
+            <div class="invalid-feedback">{{ form.controls.durationInMonths.getError('server') ?? 'Choose a duration that fits the remaining freeze days.' }}</div>
+          }
+          @if (membership(); as m) {
+            <div class="form-hint mt-1">{{ m.remainingFreezeDays }} of {{ m.maxFreezeDays }} freeze days and {{ m.remainingFreezes }} of {{ m.maxFreezes }} freezes left.</div>
+          }
+
+          <label class="form-label d-block mt-3 req" for="freeze-reason">Reason for Freeze</label>
+          <select id="freeze-reason" class="form-select reason" formControlName="reason" data-testid="freeze-reason"
+                  [class.is-invalid]="form.controls.reason.touched && form.controls.reason.invalid">
+            <option [ngValue]="null" disabled>Select a reason</option>
+            @for (r of reasons; track r.value) { <option [ngValue]="r.value">{{ r.label }}</option> }
+          </select>
+          @if (form.controls.reason.touched && form.controls.reason.invalid) {
+            <div class="invalid-feedback">{{ form.controls.reason.getError('server') ?? 'Reason for freeze is required.' }}</div>
+          }
+
+          <label class="form-label d-block mt-3" for="freeze-notes">Additional Notes (Optional)</label>
+          <textarea id="freeze-notes" class="form-control" rows="4" formControlName="notes" maxlength="500" placeholder="Enter any relevant details..."></textarea>
+          <div class="char-count">{{ form.controls.notes.value?.length ?? 0 }} / 500</div>
+        </section>
+      </div>
+
+      <div class="col-lg-4">
+        <aside class="tf-card impact" aria-labelledby="impact-title">
+          <div class="impact-head"><h2 id="impact-title" class="h4 fw-bold m-0"><i class="bi bi-bar-chart-line me-2"></i>Projected Impact</h2></div>
+          <div class="p-4">
+            <div class="impact-row"><span>Original End Date</span><strong>{{ originalEnd() ? (originalEnd() | date: 'MMM d, y') : '—' }}</strong></div>
+            <div class="impact-row"><span>Freeze Duration</span>
+              <strong data-testid="impact-duration">{{ form.controls.durationInMonths.value ? form.controls.durationInMonths.value + (form.controls.durationInMonths.value === 1 ? ' Month' : ' Months') : '—' }}</strong>
+            </div>
+            @if (freezeEnd(); as end) {
+              <div class="impact-row small"><span>Frozen until</span><span>{{ end | date: 'MMM d, y' }} ({{ freezeDaysUsed() }} days)</span></div>
+            }
+            <div class="new-end"><span>New End Date</span><strong data-testid="new-end">{{ newEndDate() ? (newEndDate() | date: 'MMM d, y') : '—' }}</strong></div>
+            <p class="small text-muted-tf mt-3 mb-0">* Billing will automatically pause during the freeze period and resume upon reactivation.</p>
+          </div>
+          <div class="p-4 border-top d-grid gap-2">
+            <button type="submit" class="btn btn-navy" [disabled]="form.invalid || saving() || !canFreeze()" data-testid="confirm-freeze">
+              <i class="bi bi-snow me-1"></i> Confirm Freeze
+            </button>
+            <button type="button" class="btn btn-outline-navy" (click)="cancel()">Cancel</button>
+          </div>
+        </aside>
+      </div>
+    </div>
+  </form>
+}

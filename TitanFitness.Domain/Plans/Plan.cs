@@ -1,43 +1,59 @@
+using TitanFitness.Domain.Abstractions;
 using TitanFitness.Domain.Memberships;
 
 namespace TitanFitness.Domain.Plans;
 
-public sealed class Plan
+/// <summary>
+/// A membership offering in the catalogue. Only a published plan can be sold;
+/// a retired (unpublished) plan stays in the catalogue for history.
+/// </summary>
+public sealed class Plan : AggregateRoot
 {
-    public Guid Id { get; private set; }
+    public const int NameMinLength = 2;
+    public const int NameMaxLength = 60;
+
     public string Name { get; private set; } = null!;
     public MembershipTerms Terms { get; private set; } = null!;
     public bool IsPublished { get; private set; }
 
-    private Plan() { }
-
-    public Plan(string name, MembershipTerms terms)
+    private Plan()
     {
-        Id = Guid.CreateVersion7();
-        Rename(name);
-        ChangeTerms(terms);
     }
 
-    public void Rename(string name)
+    public static Result<Plan> Create(string name, MembershipTerms terms, bool isPublished)
     {
-        if (string.IsNullOrWhiteSpace(name))
-            throw new ArgumentException("Plan name is required.", nameof(name));
+        var plan = new Plan { Id = Guid.CreateVersion7() };
 
-        var trimmed = name.Trim();
+        var applied = plan.Update(name, terms, isPublished);
+        if (applied.IsFailure)
+            return applied.Error;
 
-        if (trimmed.Length > 50)
-            throw new ArgumentException("Plan name cannot exceed 50 characters.", nameof(name));
-
-        Name = trimmed;
+        return plan;
     }
 
-    public void ChangeTerms(MembershipTerms terms)
+    /// <summary>
+    /// Replaces the terms this plan sells. Memberships already sold hold their own copy and do not change.
+    /// </summary>
+    public Result Update(string name, MembershipTerms terms, bool isPublished)
     {
-        ArgumentNullException.ThrowIfNull(terms);
+        var cleanName = Guard.Required(name, NameMaxLength, "name", "Plan name");
+        if (cleanName.IsFailure)
+            return cleanName.Error;
+
+        if (cleanName.Value.Length < NameMinLength)
+            return Error.Validation("Plan.NameTooShort", $"Plan name must be at least {NameMinLength} characters.", "name");
+
+        Name = cleanName.Value;
         Terms = terms;
+        IsPublished = isPublished;
+        return Result.Success();
     }
+}
 
-    public void Publish() => IsPublished = true;
+public static class PlanErrors
+{
+    public static readonly Error NotFound = Error.NotFound("Plan.NotFound", "The plan was not found.");
 
-    public void Unpublish() => IsPublished = false;
+    public static Error DuplicateName(string name) =>
+        Error.Conflict("Plan.DuplicateName", $"A plan named '{name}' already exists.", "name");
 }

@@ -1,6 +1,4 @@
-using System.Reflection;
 using FluentValidation;
-using MediatR;
 using Microsoft.Extensions.DependencyInjection;
 using TitanFitness.Application.Common;
 
@@ -10,11 +8,18 @@ public static class DependencyInjection
 {
     public static IServiceCollection AddApplication(this IServiceCollection services)
     {
-        var assembly = Assembly.GetExecutingAssembly();
+        var assembly = typeof(DependencyInjection).Assembly;
 
-        services.AddMediatR(cfg => cfg.RegisterServicesFromAssembly(assembly));
-        services.AddValidatorsFromAssembly(assembly);
-        services.AddTransient(typeof(IPipelineBehavior<,>), typeof(ValidationBehavior<,>));
+        services.AddMediatR(cfg =>
+        {
+            cfg.RegisterServicesFromAssembly(assembly);
+            cfg.AddOpenBehavior(typeof(LoggingBehavior<,>));
+        });
+
+        // Request validators live next to their request in each feature's Contracts folder.
+        services.AddValidatorsFromAssembly(assembly, includeInternalTypes: true);
+
+        services.AddScoped<Features.ClassSessions.Shared.ClassSessionChecks>();
 
         return services;
     }

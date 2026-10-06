@@ -1,10 +1,15 @@
-using TitanFitness.Domain.Common;
+using TitanFitness.Domain.Abstractions;
 
 namespace TitanFitness.Domain.Sessions;
 
-public sealed class Booking
+/// <summary>
+/// A member's place on a class. Owned by <see cref="ClassSession"/>, which decides whether a new
+/// booking is confirmed or goes on the waitlist.
+/// </summary>
+public sealed class Booking : Entity
 {
-    public Guid Id { get; private set; }
+    public const int NoteMaxLength = 500;
+
     public Guid SessionId { get; private set; }
     public Guid MemberId { get; private set; }
     public DateTime BookedOn { get; private set; }
@@ -13,60 +18,54 @@ public sealed class Booking
     public string? Note { get; private set; }
     public DateTime? CancelledOn { get; private set; }
 
-    private Booking() { }
-
-    internal Booking(Guid sessionId, Guid memberId, int position, string? note, DateTime now)
+    private Booking()
     {
-        if (sessionId == Guid.Empty)
-            throw new ArgumentException("Session is required.", nameof(sessionId));
+    }
 
-        if (memberId == Guid.Empty)
-            throw new ArgumentException("Member is required.", nameof(memberId));
+    internal static Result<Booking> Create(Guid sessionId, Guid memberId, int position, string? note, DateTime now)
+    {
+        var member = Guard.RequiredId(memberId, "memberId", "Member");
+        if (member.IsFailure)
+            return member.Error;
 
-        Id = Guid.CreateVersion7();
-        SessionId = sessionId;
-        MemberId = memberId;
-        Position = position;
-        BookedOn = now;
-        Status = BookingStatus.Waitlisted;
-        Note = Text.Optional(note, 500, nameof(note));
+        var cleanNote = Guard.Optional(note, NoteMaxLength, "note", "Note");
+        if (cleanNote.IsFailure)
+            return cleanNote.Error;
+
+        return new Booking
+        {
+            Id = Guid.CreateVersion7(),
+            SessionId = sessionId,
+            MemberId = memberId,
+            Position = position,
+            BookedOn = now,
+            Status = BookingStatus.Waitlisted,
+            Note = cleanNote.Value
+        };
     }
 
     public bool IsActive => Status is not BookingStatus.Cancelled;
 
-    public bool HoldsAPlace =>
-        Status is BookingStatus.Confirmed or BookingStatus.Attended or BookingStatus.NoShow;
+    public bool HoldsAPlace => Status is BookingStatus.Confirmed or BookingStatus.Attended or BookingStatus.NoShow;
 
-    internal void Confirm()
-    {
-        if (Status is not BookingStatus.Waitlisted)
-            throw new InvalidOperationException("Only a waitlisted booking can be confirmed.");
+    internal void Confirm() => Status = BookingStatus.Confirmed;
 
-        Status = BookingStatus.Confirmed;
-    }
-
-    internal void Cancel(DateTime now)
+    internal Result Cancel(DateTime now)
     {
         if (Status is BookingStatus.Cancelled)
-            throw new InvalidOperationException("This booking is already cancelled.");
+            return Error.Conflict("Booking.AlreadyCancelled", "This booking is already cancelled.");
 
         Status = BookingStatus.Cancelled;
         CancelledOn = now;
+        return Result.Success();
     }
 
-    internal void MarkAttended()
+    internal Result MarkAttendance(bool attended)
     {
         if (!HoldsAPlace)
-            throw new InvalidOperationException("Only a confirmed booking can be marked as attended.");
+            return Error.Conflict("Booking.NotConfirmed", "Only a confirmed booking can have attendance marked.");
 
-        Status = BookingStatus.Attended;
-    }
-
-    internal void MarkNoShow()
-    {
-        if (!HoldsAPlace)
-            throw new InvalidOperationException("Only a confirmed booking can be marked as a no show.");
-
-        Status = BookingStatus.NoShow;
+        Status = attended ? BookingStatus.Attended : BookingStatus.NoShow;
+        return Result.Success();
     }
 }

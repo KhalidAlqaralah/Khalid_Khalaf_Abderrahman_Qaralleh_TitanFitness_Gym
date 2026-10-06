@@ -1,0 +1,106 @@
+<button type="button" class="back-link mb-2" (click)="backToList()" data-testid="back-to-list"><i class="bi bi-arrow-left"></i> Back to list</button>
+
+<div class="d-flex flex-wrap align-items-start justify-content-between gap-3 mb-4">
+  <div>
+    <div class="d-flex align-items-center gap-3">
+      <h1>{{ mode() === 'add' ? 'New Plan' : (plan()?.name ?? 'Plan') }}</h1>
+      <span class="tf-badge mode" data-testid="mode-badge"><span class="dot"></span>{{ badge() }}</span>
+    </div>
+    <p class="page-subtitle">{{ mode() === 'add' ? 'Add a membership plan to the catalogue.' : 'Plan details' }}</p>
+  </div>
+  @if (mode() === 'view' && plan()) {
+    <button type="button" class="btn btn-navy" (click)="editInPlace()" data-testid="edit-plan"><i class="bi bi-pencil me-1"></i> Edit Plan</button>
+  }
+</div>
+
+@if (loading()) {
+  <div class="state-box"><span class="spinner-border spinner-border-sm me-2"></span>Loading plan…</div>
+} @else if (notFound()) {
+  <div class="tf-card state-box" data-testid="plan-not-found"><i class="bi bi-tag"></i>Plan not found.
+    <div class="mt-2"><button type="button" class="btn btn-outline-navy btn-sm" (click)="backToList()">Back to the catalogue</button></div>
+  </div>
+} @else {
+  <form [formGroup]="form" (ngSubmit)="save()" novalidate>
+    <section class="tf-card mb-4">
+      <div class="tf-card-header"><h2>Plan Details</h2></div>
+      <div class="tf-card-body" [appAutofocus]="mode() !== 'view'">
+        <div class="row g-4">
+          <div class="col-md-6">
+            <label class="form-label" [class.req]="mode() !== 'view'" for="p-name">Plan name</label>
+            <input id="p-name" class="form-control" formControlName="name" placeholder="e.g., Annual Pro" maxlength="60" [class.is-invalid]="error('name')" data-testid="p-name">
+            @if (error('name'); as e) { <div class="invalid-feedback" data-testid="p-name-error">{{ e }}</div> }
+          </div>
+          <div class="col-md-6">
+            <label class="form-label" [class.req]="mode() !== 'view'" for="p-price">Price</label>
+            <div class="input-group">
+              <span class="input-group-text">$</span>
+              <input id="p-price" type="number" class="form-control" formControlName="price" placeholder="0.00" min="0" step="0.01" [class.is-invalid]="error('price')" data-testid="p-price">
+            </div>
+            @if (error('price'); as e) { <div class="invalid-feedback">{{ e }}</div> }
+          </div>
+          <div class="col-md-6">
+            <label class="form-label" [class.req]="mode() !== 'view'" for="p-duration">Duration in months</label>
+            <input id="p-duration" type="number" class="form-control" formControlName="durationInMonths" placeholder="e.g., 12" min="1" max="36" step="1" [class.is-invalid]="error('durationInMonths')" data-testid="p-duration">
+            @if (error('durationInMonths'); as e) { <div class="invalid-feedback">{{ e }}</div> }
+          </div>
+          <div class="col-md-6">
+            <span class="form-label d-block">Status</span>
+            <div class="form-check">
+              <input id="p-published" class="form-check-input" type="checkbox" formControlName="isPublished" data-testid="p-published">
+              <label class="form-check-label" for="p-published">IsPublished</label>
+            </div>
+            @if (mode() !== 'view') { <div class="form-hint">Ticked means true, unticked means false.</div> }
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="tf-card">
+      <div class="tf-card-header"><h2>Terms Offered</h2></div>
+      <div class="tf-card-body">
+        <div class="row g-4">
+          <div class="col-md-6">
+            <label class="form-label" for="p-days">Maximum freeze days</label>
+            <input id="p-days" type="number" class="form-control" formControlName="maxFreezeDays" placeholder="0" min="0" step="1" [class.is-invalid]="error('maxFreezeDays')" data-testid="p-days">
+            @if (error('maxFreezeDays'); as e) { <div class="invalid-feedback">{{ e }}</div> }
+          </div>
+          <div class="col-md-6">
+            <label class="form-label" for="p-freezes">Maximum number of freezes</label>
+            <input id="p-freezes" type="number" class="form-control" formControlName="maxFreezes" placeholder="0" min="0" step="1"
+                   [class.is-invalid]="error('maxFreezes') || form.hasError('freezesWithoutDays')" data-testid="p-freezes">
+            @if (error('maxFreezes'); as e) { <div class="invalid-feedback">{{ e }}</div> }
+            @if (form.hasError('freezesWithoutDays')) { <div class="invalid-feedback" data-testid="p-freezes-error">Must be 0 when maximum freeze days is 0.</div> }
+          </div>
+          <div class="col-md-6">
+            <label class="form-label" for="p-guests">Guest pass quota</label>
+            <input id="p-guests" type="number" class="form-control" formControlName="guestPassQuota" placeholder="0" min="0" step="1" [class.is-invalid]="error('guestPassQuota')" data-testid="p-guests">
+            @if (error('guestPassQuota'); as e) { <div class="invalid-feedback">{{ e }}</div> }
+          </div>
+          <div class="col-md-6">
+            <span class="form-label d-block">Access scope</span>
+            @if (mode() === 'view') {
+              <input class="form-control" [value]="(plan()?.accessScope ?? '') | label" disabled aria-label="Access scope">
+            } @else {
+              <div class="choice-cards" role="radiogroup" aria-label="Access scope">
+                @for (a of accessOptions; track a.value) {
+                  <button type="button" role="radio" class="choice-card" [class.selected]="form.controls.accessScope.value === a.value"
+                          [attr.aria-checked]="form.controls.accessScope.value === a.value" (click)="chooseAccess(a.value)" [attr.data-testid]="'access-' + a.value">
+                    {{ a.label }}
+                  </button>
+                }
+              </div>
+              <div class="form-hint mt-1">Neither selected is saved as Home branch only.</div>
+            }
+          </div>
+        </div>
+      </div>
+    </section>
+
+    @if (mode() !== 'view') {
+      <div class="d-flex justify-content-end gap-2 mt-4">
+        <button type="button" class="btn btn-outline-navy" (click)="cancel()" data-testid="cancel">Cancel</button>
+        <button type="submit" class="btn btn-navy" [disabled]="saving()" data-testid="save">{{ mode() === 'add' ? 'Save Plan' : 'Save Changes' }}</button>
+      </div>
+    }
+  </form>
+}

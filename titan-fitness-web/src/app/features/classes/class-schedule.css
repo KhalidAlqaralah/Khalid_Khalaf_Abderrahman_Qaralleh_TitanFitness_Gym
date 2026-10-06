@@ -1,0 +1,20 @@
+.toolbar .form-select { width: 170px; }
+.date-group { width: 250px; }
+.list-head { background: #f9fafb; }
+.day-head { padding: .6rem 1.25rem; background: #f3f4f6; font-weight: 700; font-size: .85rem; color: var(--tf-muted); border-bottom: 1px solid var(--tf-line); }
+.session { display: flex; align-items: center; gap: 1.25rem; padding: 1rem 1.25rem; border-bottom: 1px solid var(--tf-line); }
+.session.running { background: #f3f5fa; border-left: 3px solid var(--tf-navy); }
+.session.cancelled { opacity: .65; }
+.session.cancelled .session-name { text-decoration: line-through; }
+.time { width: 58px; background: #f3f4f6; border: 1px solid var(--tf-line); text-align: center; padding: .35rem 0; display: flex; flex-direction: column; flex-shrink: 0; }
+.time span { font-size: .72rem; color: var(--tf-muted); }
+.session-name { border: 0; background: none; padding: 0; font-size: 1.2rem; font-weight: 700; display: inline-flex; align-items: center; gap: .5rem; text-align: left; color: var(--tf-ink); }
+.running .session-name { color: var(--tf-navy); }
+.hot-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--tf-red); display: inline-block; }
+.meta { color: var(--tf-muted); display: flex; flex-wrap: wrap; gap: .5rem; font-size: .9rem; }
+.sep { color: #c0c5ce; }
+.enrolment { width: 110px; flex-shrink: 0; }
+.stat { border: 1px solid var(--tf-line); background: #f9fafb; padding: 1rem; display: flex; flex-direction: column; }
+.stat .bi { color: var(--tf-navy); }
+.stat strong { font-size: 2.6rem; line-height: 1.2; }
+.stat span { color: var(--tf-muted); font-size: .85rem; }
